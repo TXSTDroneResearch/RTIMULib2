@@ -51,7 +51,7 @@ bool RTHumidityHTU21D::humidityInit()
         return false;
 
     m_state = HTU21D_STATE_IN_RESET;
-    m_startTime = RTMath::currentUSecsSinceEpoch();
+    m_startTime = RTMath::currentUSecs();
     return true;
 }
 
@@ -72,7 +72,7 @@ bool RTHumidityHTU21D::humidityRead(RTIMU_DATA& data)
 bool RTHumidityHTU21D:: processBackground()
 {
     unsigned char rawData[3];
-    uint64_t now = RTMath::currentUSecsSinceEpoch();
+    uint64_t now = RTMath::currentUSecs();
     bool expired = (now - m_startTime) >= HTU21D_STATE_INTERVAL;
 
     if (!expired)

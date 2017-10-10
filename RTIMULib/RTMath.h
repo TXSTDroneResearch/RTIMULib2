@@ -54,10 +54,10 @@ public:
     static const char *display(const char *label, RTQuaternion& quat);
     static const char *display(const char *label, RTMatrix4x4& mat);
 
-    //  currentUSecsSinceEpoch() is the source of all timestamps and
-    //  is the number of uS since the standard epoch
+    //  currentUSecs() is the source of all timestamps and
+    //  is the number of uS since the first call
 
-    static uint64_t currentUSecsSinceEpoch();
+    static uint64_t currentUSecs();
 
     //  poseFromAccelMag generates pose Euler angles from measured settings
 

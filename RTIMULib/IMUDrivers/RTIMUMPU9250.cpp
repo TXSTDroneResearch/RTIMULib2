@@ -641,7 +641,7 @@ bool RTIMUMPU9250::IMURead()
     calibrateAccel();
 
     if (m_firstTime)
-        m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
+        m_imuData.timestamp = RTMath::currentUSecs();
     else
         m_imuData.timestamp += m_sampleInterval;
 

@@ -22,25 +22,24 @@
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "RTMath.h"
-#ifdef WIN32
-#include <qdatetime.h>
-#endif
+
+#include <chrono>
 
 //  Strings are put here. So the display functions are no re-entrant!
 
 char RTMath::m_string[1000];
 
-uint64_t RTMath::currentUSecsSinceEpoch()
-{
-#ifdef WIN32
-#include <qdatetime.h>
-    return QDateTime::currentMSecsSinceEpoch();
-#else
-    struct timeval tv;
+static std::chrono::time_point<std::chrono::steady_clock> first_time;
+uint64_t RTMath::currentUSecs() {
+  static bool initialized = false;
+  if (!initialized) {
+    first_time = std::chrono::high_resolution_clock::now();
+    initialized = true;
+  }
 
-    gettimeofday(&tv, NULL);
-    return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
-#endif
+  auto now = std::chrono::high_resolution_clock::now();
+  return std::chrono::duration_cast<std::chrono::microseconds>(now - first_time)
+      .count();
 }
 
 const char *RTMath::displayRadians(const char *label, RTVector3& vec)

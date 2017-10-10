@@ -426,7 +426,7 @@ bool RTIMUBMX055::IMURead()
         if (!m_settings->HALWrite(m_gyroSlaveAddr, BMX055_GYRO_FIFO_CONFIG_1, 0x40, "Failed to set BMX055 FIFO config"))
             return false;
 
-        m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();  // try to fix timestamp
+        m_imuData.timestamp = RTMath::currentUSecs();  // try to fix timestamp
         return false;
     }
 
@@ -486,7 +486,7 @@ bool RTIMUBMX055::IMURead()
     calibrateAccel();
 
     if (m_firstTime)
-        m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
+        m_imuData.timestamp = RTMath::currentUSecs();
     else
         m_imuData.timestamp += m_sampleInterval;
 

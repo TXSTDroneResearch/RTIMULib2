@@ -488,7 +488,7 @@ bool RTIMUGD20M303DLHC::IMURead()
     if (!m_settings->HALRead(m_gyroSlaveAddr, 0x80 | L3GD20_OUT_X_L, 6, gyroData, "Failed to read L3GD20 data"))
         return false;
 
-    m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
+    m_imuData.timestamp = RTMath::currentUSecs();
 
     if (!m_settings->HALRead(m_accelSlaveAddr, 0x80 | LSM303DLHC_OUT_X_L_A, 6, accelData, "Failed to read LSM303DLHC accel data"))
         return false;

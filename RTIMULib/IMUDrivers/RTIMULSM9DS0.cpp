@@ -496,7 +496,7 @@ bool RTIMULSM9DS0::IMURead()
     if (!m_settings->HALRead(m_gyroSlaveAddr, 0x80 | LSM9DS0_GYRO_OUT_X_L, 6, gyroData, "Failed to read LSM9DS0 gyro data"))
         return false;
 
-    m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
+    m_imuData.timestamp = RTMath::currentUSecs();
 
     if (!m_settings->HALRead(m_accelCompassSlaveAddr, 0x80 | LSM9DS0_OUT_X_L_A, 6, accelData, "Failed to read LSM9DS0 accel data"))
         return false;

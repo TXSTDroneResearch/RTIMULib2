@@ -54,7 +54,7 @@ bool RTIMUBNO055::IMUInit()
     unsigned char result;
 
     m_slaveAddr = m_settings->m_I2CSlaveAddress;
-    m_lastReadTime = RTMath::currentUSecsSinceEpoch();
+    m_lastReadTime = RTMath::currentUSecs();
 
     // set validity flags
 
@@ -133,10 +133,10 @@ bool RTIMUBNO055::IMURead()
 {
     unsigned char buffer[24];
 
-    if ((RTMath::currentUSecsSinceEpoch() - m_lastReadTime) < m_sampleInterval)
+    if ((RTMath::currentUSecs() - m_lastReadTime) < m_sampleInterval)
         return false;                                       // too soon
 
-    m_lastReadTime = RTMath::currentUSecsSinceEpoch();
+    m_lastReadTime = RTMath::currentUSecs();
     if (!m_settings->HALRead(m_slaveAddr, BNO055_ACCEL_DATA, 24, buffer, "Failed to read BNO055 data"))
         return false;
 
@@ -186,6 +186,6 @@ bool RTIMUBNO055::IMURead()
 
     m_imuData.fusionQPose.fromEuler(m_imuData.fusionPose);
 
-    m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
+    m_imuData.timestamp = RTMath::currentUSecs();
     return true;
 }

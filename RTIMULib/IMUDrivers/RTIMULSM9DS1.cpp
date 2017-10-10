@@ -374,7 +374,7 @@ bool RTIMULSM9DS1::IMURead()
     }
 
 
-    m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
+    m_imuData.timestamp = RTMath::currentUSecs();
 
     RTMath::convertToVector(gyroData, m_imuData.gyro, m_gyroScale, false);
     RTMath::convertToVector(accelData, m_imuData.accel, m_accelScale, false);

@@ -66,7 +66,7 @@ bool RTPressureMS5611::pressureRead(RTIMU_DATA& data)
             return false;
         } else {
             m_state = MS5611_STATE_PRESSURE;
-            m_timer = RTMath::currentUSecsSinceEpoch();
+            m_timer = RTMath::currentUSecs();
         }
     }
 
@@ -91,7 +91,7 @@ void RTPressureMS5611::pressureBackground()
         break;
 
         case MS5611_STATE_PRESSURE:
-        if ((RTMath::currentUSecsSinceEpoch() - m_timer) < 10000)
+        if ((RTMath::currentUSecs() - m_timer) < 10000)
             break;                                          // not time yet
         if (!m_settings->HALRead(m_pressureAddr, MS5611_CMD_ADC, 3, data, "Failed to read MS5611 pressure")) {
             break;
@@ -104,12 +104,12 @@ void RTPressureMS5611::pressureBackground()
             break;
         } else {
             m_state = MS5611_STATE_TEMPERATURE;
-            m_timer = RTMath::currentUSecsSinceEpoch();
+            m_timer = RTMath::currentUSecs();
         }
         break;
 
         case MS5611_STATE_TEMPERATURE:
-        if ((RTMath::currentUSecsSinceEpoch() - m_timer) < 10000)
+        if ((RTMath::currentUSecs() - m_timer) < 10000)
             break;                                          // not time yet
         if (!m_settings->HALRead(m_pressureAddr, MS5611_CMD_ADC, 3, data, "Failed to read MS5611 temperature")) {
             break;
