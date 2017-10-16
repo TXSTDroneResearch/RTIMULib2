@@ -1,0 +1,11 @@
+---
+BasedOnStyle: Google
+DerivePointerAlignment: false
+PointerAlignment: Right
+SortIncludes: true
+IndentWidth: 4
+BreakBeforeBraces: Linux
+
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+ColumnLimit: 120

@@ -332,7 +332,7 @@ bool RTIMUMPU9250::setSampleRate()
 bool RTIMUMPU9250::compassSetup() {
     unsigned char asa[3];
 
-    if (m_settings->m_busIsI2C) {
+    if (m_settings->busIsI2C()) {
         // I2C mode
 
         bypassOn();

@@ -93,7 +93,7 @@ public:
     const char *display();
     const char *displayDegrees();
 
-    static float dotProduct(const RTVector3& a, const RTVector3& b);
+    static RTFLOAT dotProduct(const RTVector3& a, const RTVector3& b);
     static void crossProduct(const RTVector3& a, const RTVector3& b, RTVector3& d);
 
     void accelToEuler(RTVector3& rollPitchYaw) const;

@@ -48,13 +48,13 @@ void SelectIMUDlg::onOk()
 {
     if (m_selectBus->currentIndex() < 8) {
         // I2C
-        m_settings->m_busIsI2C = true;
-        m_settings->m_I2CBus = m_selectBus->currentIndex();
+        m_settings->hal()->m_busIsI2C = true;
+        m_settings->hal()->m_I2CBus = m_selectBus->currentIndex();
         m_settings->m_I2CSlaveAddress = m_selectAddress->itemData(m_selectAddress->currentIndex()).toInt();
     } else {
         // SPI
-        m_settings->m_busIsI2C = false;
-        m_settings->m_SPIBus = m_selectBus->currentIndex() - 8;
+        m_settings->hal()->m_busIsI2C = false;
+        m_settings->hal()->m_SPIBus = m_selectBus->currentIndex() - 8;
     }
     m_settings->m_imuType = m_selectIMU->currentIndex();
     m_settings->saveSettings();
@@ -99,10 +99,10 @@ void SelectIMUDlg::layoutWindow()
     m_selectBus->addItem("SPI bus 6");
     m_selectBus->addItem("SPI bus 7");
 
-    if (m_settings->m_busIsI2C)
-        m_selectBus->setCurrentIndex(m_settings->m_I2CBus);
+    if (m_settings->hal()->m_busIsI2C)
+        m_selectBus->setCurrentIndex(m_settings->hal()->m_I2CBus);
     else
-        m_selectBus->setCurrentIndex(m_settings->m_SPIBus + 8);
+        m_selectBus->setCurrentIndex(m_settings->hal()->m_SPIBus + 8);
 
     form->addRow("select bus type: ", m_selectBus);
 

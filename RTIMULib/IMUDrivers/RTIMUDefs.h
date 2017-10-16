@@ -257,8 +257,8 @@
 
 //  Register map
 
-#define MPU9255_SMPRT_DIV           0x19
-#define MPU9255_GYRO_LPF            0x1a
+#define MPU9255_SMPLRT_DIV          0x19
+#define MPU9255_CONFIG              0x1a
 #define MPU9255_GYRO_CONFIG         0x1b
 #define MPU9255_ACCEL_CONFIG        0x1c
 #define MPU9255_ACCEL_LPF           0x1d
@@ -278,7 +278,19 @@
 #define MPU9255_INT_ENABLE          0x38
 #define MPU9255_INT_STATUS          0x3a
 #define MPU9255_ACCEL_XOUT_H        0x3b
+#define MPU9255_ACCEL_XOUT_L        0x3c
+#define MPU9255_ACCEL_YOUT_H        0x3d
+#define MPU9255_ACCEL_YOUT_L        0x3e
+#define MPU9255_ACCEL_ZOUT_H        0x3f
+#define MPU9255_ACCEL_ZOUT_L        0x40
+#define MPU9255_TEMP_OUT_H          0x41
+#define MPU9255_TEMP_OUT_L          0x42
 #define MPU9255_GYRO_XOUT_H         0x43
+#define MPU9255_GYRO_XOUT_L         0x44
+#define MPU9255_GYRO_YOUT_H         0x45
+#define MPU9255_GYRO_YOUT_L         0x46
+#define MPU9255_GYRO_ZOUT_H         0x47
+#define MPU9255_GYRO_ZOUT_L         0x48
 #define MPU9255_EXT_SENS_DATA_00    0x49
 #define MPU9255_I2C_SLV1_DO         0x64
 #define MPU9255_I2C_MST_DELAY_CTRL  0x67
@@ -296,6 +308,44 @@
 
 #define MPU9255_COMPASSRATE_MIN     1                       // 1 samples per second is the lowest
 #define MPU9255_COMPASSRATE_MAX     100                     // 100 samples per second is maximum
+
+// CONFIG options
+#define MPU9255_CONFIG_FIFO_MODE_NO_OVERWRITE 0x40
+
+// FIFO_EN options
+#define MPU9255_FIFO_EN_TEMP_OUT              0x80
+#define MPU9255_FIFO_EN_GYRO_ALL              0x70
+#define MPU9255_FIFO_EN_GYRO_XO_UT            0x40
+#define MPU9255_FIFO_EN_GYRO_YO_UT            0x20
+#define MPU9255_FIFO_EN_GYRO_ZO_UT            0x10
+#define MPU9255_FIFO_EN_ACCEL                 0x08
+#define MPU9255_FIFO_EN_SLV_2                 0x04
+#define MPU9255_FIFO_EN_SLV_1                 0x02
+#define MPU9255_FIFO_EN_SLV_0                 0x01
+
+// I2C_MST_CTRL options
+#define MPU9255_I2C_MST_CTRL_WAIT_FOR_ES      0x40
+
+// I2C_SLV*_CTRL options
+#define MPU9255_I2C_SLVX_CTRL_EN              0x80
+#define MPU9255_I2C_SLVX_CTRL_GRP             0x08
+
+// INT_PIN_CFG options
+#define MPU9255_INT_PIN_CFG_ACTL              0x80
+#define MPU9255_INT_PIN_CFG_OPEN              0x40
+#define MPU9255_INT_PIN_CFG_BYPASS_EN         0x02
+
+// INT_ENABLE options
+#define MPU9255_INT_ENABLE_RAW_RDY_EN         0x01
+
+// USER_CTRL options
+#define MPU9255_USER_CTRL_FIFO_EN             0x40
+#define MPU9255_USER_CTRL_I2C_MST_EN          0x20
+#define MPU9255_USER_CTRL_FIFO_RST            0x04          // FIFO reset, auto-cleared
+
+// PWR_MGMT_1 options
+#define MPU9255_PWR_MGMT_1_H_RESET  0x80                    // full reset, auto-cleared
+#define MPU9255_PWR_MGMT_1_CLK_AUTO 0x01                    // automatic clock
 
 //  Gyro LPF options
 
@@ -334,6 +384,7 @@
 
 #define AK8963_DEVICEID             0x48                    // the device ID
 #define AK8963_ST1                  0x02                    // status 1
+#define AK8963_HXL                  0x03                    // compass data
 #define AK8963_CNTL                 0x0a                    // control reg
 #define AK8963_ASAX                 0x10                    // start of the fuse ROM data
 

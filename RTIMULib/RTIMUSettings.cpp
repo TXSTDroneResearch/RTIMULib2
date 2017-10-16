@@ -46,6 +46,8 @@
 
 RTIMUSettings::RTIMUSettings(const char *productType)
 {
+    m_hal = new RTIMUHal();
+
     if ((strlen(productType) > 200) || (strlen(productType) == 0)) {
         HAL_ERROR("Product name too long or null - using default\n");
         strcpy(m_filename, "RTIMULib.ini");
@@ -66,18 +68,58 @@ RTIMUSettings::RTIMUSettings(const char *settingsDirectory, const char *productT
     loadSettings();
 }
 
+RTIMUSettings::~RTIMUSettings()
+{
+    if (m_hal) {
+        delete m_hal;
+        m_hal = NULL;
+    }
+}
 
-bool RTIMUSettings::discoverIMU(int& imuType, bool& busIsI2C, unsigned char& slaveAddress)
+bool RTIMUSettings::HALOpen() { return m_hal->HALOpen(); }
+
+void RTIMUSettings::HALClose() { return m_hal->HALClose(); }
+
+bool RTIMUSettings::HALRead(unsigned char slaveAddr, unsigned char regAddr,
+                            unsigned char length, unsigned char *data,
+                            const char *errorMsg) {
+  return m_hal->HALRead(slaveAddr, regAddr, length, data, errorMsg);
+}
+
+bool RTIMUSettings::HALRead(unsigned char slaveAddr, unsigned char length,
+                            unsigned char *data, const char *errorMsg) {
+  return m_hal->HALRead(slaveAddr, length, data, errorMsg);
+}
+
+bool RTIMUSettings::HALWrite(unsigned char slaveAddr, unsigned char regAddr,
+                             unsigned char length, unsigned char const *data,
+                             const char *errorMsg) {
+  return m_hal->HALWrite(slaveAddr, regAddr, length, data, errorMsg);
+}
+
+bool RTIMUSettings::HALWrite(unsigned char slaveAddr, unsigned char regAddr,
+                             unsigned char const data, const char *errorMsg) {
+  return m_hal->HALWrite(slaveAddr, regAddr, data, errorMsg);
+}
+
+void RTIMUSettings::delayMs(int milliSeconds) {
+  return m_hal->delayMs(milliSeconds);
+}
+
+bool RTIMUSettings::discoverIMU()
 {
     unsigned char result;
     unsigned char altResult;
 
     //  auto detect on I2C bus
 
-    m_busIsI2C = true;
+    int& imuType = m_imuType;
+    bool& busIsI2C = m_hal->m_busIsI2C;
+    unsigned char& slaveAddress = m_I2CSlaveAddress;
+
+    m_hal->m_busIsI2C = true;
 
     if (HALOpen()) {
-
         if (HALRead(MPU9150_ADDRESS0, MPU9150_WHO_AM_I, 1, &result, "")) {
             if (result == MPU9255_ID) {
                 imuType = RTIMU_TYPE_MPU9255;
@@ -356,50 +398,36 @@ bool RTIMUSettings::discoverIMU(int& imuType, bool& busIsI2C, unsigned char& sla
 
     //  nothing found on I2C bus - try SPI instead
 
-    m_busIsI2C = false;
-    m_SPIBus = 0;
+    m_hal->m_busIsI2C = false;
 
-    m_SPISelect = 0;
+    for (uint8_t i = 0; i < 9; i++) {
+        m_hal->m_SPIBus = i;
+        for (uint8_t j = 0; j < 2; j++) {
+            m_hal->m_SPISelect = j;
 
-    if (HALOpen()) {
-        if (HALRead(MPU9250_ADDRESS0, MPU9250_WHO_AM_I, 1, &result, "")) {
-            if (result == MPU9255_ID) {
-                imuType = RTIMU_TYPE_MPU9255;
-                slaveAddress = MPU9255_ADDRESS0;
-                busIsI2C = false;
-                HAL_INFO("Detected MPU9255 on SPI bus 0, select 0\n");
-                return true;
-            } else if (result == MPU9250_ID) {
-                imuType = RTIMU_TYPE_MPU9250;
-                slaveAddress = MPU9250_ADDRESS0;
-                busIsI2C = false;
-                HAL_INFO("Detected MPU9250 on SPI bus 0, select 0\n");
-                return true;
+            if (HALOpen()) {
+                if (HALRead(MPU9250_ADDRESS0, MPU9250_WHO_AM_I, 1, &result, "")) {
+                    if (result == MPU9255_ID) {
+                        imuType = RTIMU_TYPE_MPU9255;
+                        slaveAddress = MPU9255_ADDRESS0;
+                        busIsI2C = false;
+                        HAL_INFO2("Detected MPU9255 on SPI bus %d, select %d\n", i, j);
+                        return true;
+                    } else if (result == MPU9250_ID) {
+                        imuType = RTIMU_TYPE_MPU9250;
+                        slaveAddress = MPU9250_ADDRESS0;
+                        busIsI2C = false;
+                        HAL_INFO2("Detected MPU9250 on SPI bus %d, select %d\n", i, j);
+                        return true;
+                    }
+                }
+                HALClose();
             }
         }
-        HALClose();
     }
 
-    m_SPISelect = 1;
-
-    if (HALOpen()) {
-        if (HALRead(MPU9250_ADDRESS0, MPU9250_WHO_AM_I, 1, &result, "")) {
-            if (result == MPU9255_ID) {
-                imuType = RTIMU_TYPE_MPU9255;
-                slaveAddress = MPU9250_ADDRESS0;
-                busIsI2C = false;
-                HAL_INFO("Detected MPU9255 on SPI bus 0, select 1\n");
-                return true;
-            } else if (result == MPU9250_ID) {
-                imuType = RTIMU_TYPE_MPU9250;
-                slaveAddress = MPU9250_ADDRESS0;
-                busIsI2C = false;
-                HAL_INFO("Detected MPU9250 on SPI bus 0, select 1\n");
-                return true;
-            }
-        }
-        HALClose();
-    }
+    m_hal->m_SPISelect = 0;
+    m_hal->m_SPIBus = 0;
 
     HAL_ERROR("No IMU detected\n");
     return false;
@@ -494,11 +522,11 @@ void RTIMUSettings::setDefaults()
 
     m_imuType = RTIMU_TYPE_AUTODISCOVER;
     m_I2CSlaveAddress = 0;
-    m_busIsI2C = true;
-    m_I2CBus = 1;
-    m_SPIBus = 0;
-    m_SPISelect = 0;
-    m_SPISpeed = 500000;
+    m_hal->m_busIsI2C = true;
+    m_hal->m_I2CBus = 1;
+    m_hal->m_SPIBus = 0;
+    m_hal->m_SPISelect = 0;
+    m_hal->m_SPISpeed = 500000;
     m_fusionType = RTFUSION_TYPE_RTQF;
     m_axisRotation = RTIMU_XNORTH_YEAST;
     m_pressureType = RTPRESSURE_TYPE_AUTODISCOVER;
@@ -660,15 +688,15 @@ bool RTIMUSettings::loadSettings()
         } else if (strcmp(key, RTIMULIB_FUSION_TYPE) == 0) {
             m_fusionType = atoi(val);
         } else if (strcmp(key, RTIMULIB_BUS_IS_I2C) == 0) {
-            m_busIsI2C = strcmp(val, "true") == 0;
+            m_hal->m_busIsI2C = strcmp(val, "true") == 0;
         } else if (strcmp(key, RTIMULIB_I2C_BUS) == 0) {
-            m_I2CBus = atoi(val);
+            m_hal->m_I2CBus = atoi(val);
         } else if (strcmp(key, RTIMULIB_SPI_BUS) == 0) {
-            m_SPIBus = atoi(val);
+            m_hal->m_SPIBus = atoi(val);
         } else if (strcmp(key, RTIMULIB_SPI_SELECT) == 0) {
-            m_SPISelect = atoi(val);
+            m_hal->m_SPISelect = atoi(val);
         } else if (strcmp(key, RTIMULIB_SPI_SPEED) == 0) {
-            m_SPISpeed = atoi(val);
+            m_hal->m_SPISpeed = atoi(val);
         } else if (strcmp(key, RTIMULIB_I2C_SLAVEADDRESS) == 0) {
             m_I2CSlaveAddress = atoi(val);
         } else if (strcmp(key, RTIMULIB_AXIS_ROTATION) == 0) {
@@ -997,27 +1025,27 @@ bool RTIMUSettings::saveSettings()
     setBlank();
     setComment("");
     setComment("Is bus I2C: 'true' for I2C, 'false' for SPI");
-    setValue(RTIMULIB_BUS_IS_I2C, m_busIsI2C);
+    setValue(RTIMULIB_BUS_IS_I2C, m_hal->m_busIsI2C);
 
     setBlank();
     setComment("");
     setComment("I2C Bus (between 0 and 7) ");
-    setValue(RTIMULIB_I2C_BUS, m_I2CBus);
+    setValue(RTIMULIB_I2C_BUS, m_hal->m_I2CBus);
 
     setBlank();
     setComment("");
     setComment("SPI Bus (between 0 and 7) ");
-    setValue(RTIMULIB_SPI_BUS, m_SPIBus);
+    setValue(RTIMULIB_SPI_BUS, m_hal->m_SPIBus);
 
     setBlank();
     setComment("");
     setComment("SPI select (between 0 and 1) ");
-    setValue(RTIMULIB_SPI_SELECT, m_SPISelect);
+    setValue(RTIMULIB_SPI_SELECT, m_hal->m_SPISelect);
 
     setBlank();
     setComment("");
     setComment("SPI Speed in Hz");
-    setValue(RTIMULIB_SPI_SPEED, (int)m_SPISpeed);
+    setValue(RTIMULIB_SPI_SPEED, (int)m_hal->m_SPISpeed);
 
     setBlank();
     setComment("");

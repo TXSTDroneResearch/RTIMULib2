@@ -36,7 +36,12 @@
 
 //  FIFO transfer size
 
-#define MPU9255_FIFO_CHUNK_SIZE     12                      // gyro and accels take 12 bytes
+#define MPU9255_ACCEL_CHUNK_SIZE    6
+#define MPU9255_TEMP_CHUNK_SIZE     2
+#define MPU9255_GYRO_CHUNK_SIZE     6
+#define MPU9255_COMPASS_CHUNK_SIZE  6
+
+#define MPU9255_FIFO_MAX_CHUNK_SIZE 20
 
 #ifdef MPU9255_CACHE_MODE
 
@@ -47,11 +52,9 @@
 
 typedef struct
 {
-    unsigned char data[MPU9255_FIFO_CHUNK_SIZE * MPU9255_CACHE_SIZE];
+    unsigned char data[MPU9255_FIFO_MAX_CHUNK_SIZE * MPU9255_CACHE_SIZE];
     int count;                                              // number of chunks in the cache block
     int index;                                              // current index into the cache
-    unsigned char compass[8];                               // the raw compass readings for the block
-
 } MPU9255_CACHE_BLOCK;
 
 #endif
@@ -81,6 +84,8 @@ protected:
     RTFLOAT m_compassAdjust[3];                             // the compass fuse ROM values converted for use
 
 private:
+    
+
     bool setGyroConfig();
     bool setAccelConfig();
     bool setSampleRate();
@@ -102,6 +107,11 @@ private:
 
     RTFLOAT m_gyroScale;
     RTFLOAT m_accelScale;
+
+    uint8_t m_fifoEna;                                      // FIFO enabled
+    uint8_t m_interruptCfg;                                 // interrupt config register
+    uint8_t m_interruptEna;                                 // interrupt enable register
+    uint8_t m_userControl;                                  // user control register
 
 
 #ifdef MPU9255_CACHE_MODE

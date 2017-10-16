@@ -112,8 +112,13 @@ void IMUThread::initThread()
     }
 
     //  set up IMU
+    if (!m_imu->IMUInit()) {
+        qDebug() << "IMUInit failed.";
+        delete m_imu;
+        m_imu = NULL;
 
-    m_imu->IMUInit();
+        return;
+    }
 
     //  create pressure sensor. There's a special function call for this
     //  as it makes sure that the required one is created as specified in the settings.
@@ -123,7 +128,7 @@ void IMUThread::initThread()
     newPressure();
     newHumidity();
 
-    //  poll at the rate suggested bu the IMU
+    //  poll at the rate suggested by the IMU
 
     m_timer = startTimer(m_imu->IMUGetPollInterval());
 

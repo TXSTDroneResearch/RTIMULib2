@@ -63,16 +63,6 @@
 
 #endif
 
-#if !defined(WIN32) && !defined(__APPLE__)
-#include <sys/ioctl.h>
-#include <linux/i2c-dev.h>
-#endif
-
-#if !defined(WIN32)
-#include <unistd.h>
-#include <sys/time.h>
-#endif
-
 #define MAX_WRITE_LEN                   255
 #define MAX_READ_LEN                    255
 
@@ -84,20 +74,22 @@ public:
 
     bool m_busIsI2C;                                        // true if I2C bus in use, false if SPI in use
     unsigned char m_I2CBus;                                 // I2C bus of the imu (eg 1 for Raspberry Pi usually)
+                                                            // numbers >= 8 specify an FTDI channel
     unsigned char m_SPIBus;                                 // SPI bus of the imu (eg 0 for Raspberry Pi usually)
+                                                            // numbers >= 8 specify an FTDI channel
     unsigned char m_SPISelect;                              // SPI select line - defaults to CE0
     unsigned int m_SPISpeed;                                // speed of interface
 
-    bool HALOpen();
-    void HALClose();
-    bool HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned char length,
-                 unsigned char *data, const char *errorMsg);    // normal read with register select
-    bool HALRead(unsigned char slaveAddr, unsigned char length,
-                 unsigned char *data, const char *errorMsg);    // read without register select
-    bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
-                  unsigned char length, unsigned char const *data, const char *errorMsg);
-    bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
-                  unsigned char const data, const char *errorMsg);
+    virtual bool HALOpen();
+    virtual void HALClose();
+    virtual bool HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned char length,
+                         unsigned char *data, const char *errorMsg);    // normal read with register select
+    virtual bool HALRead(unsigned char slaveAddr, unsigned char length,
+                         unsigned char *data, const char *errorMsg);    // read without register select
+    virtual bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
+                          unsigned char length, unsigned char const *data, const char *errorMsg);
+    virtual bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
+                          unsigned char const data, const char *errorMsg);
 
     void delayMs(int milliSeconds);
 
@@ -105,12 +97,13 @@ protected:
     void I2CClose();
     bool I2CSelectSlave(unsigned char slaveAddr, const char *errorMsg);
     void SPIClose();
-    bool ifWrite(unsigned char *data, unsigned char length);
+    int ifWrite(unsigned char *data, unsigned char length);
 
 private:
-    int m_I2C;
+    uintptr_t m_I2C;
     unsigned char m_currentSlave;
-    int m_SPI;
+
+    uintptr_t m_SPI;
 };
 
 #endif // _RTIMUHAL_H

@@ -196,7 +196,7 @@
 #define RTIMULIB_ACCELCAL_MAXZ              "AccelCalMaxZ"
 
 
-class RTIMUSettings : public RTIMUHal
+class RTIMUSettings
 {
 public:
 
@@ -208,10 +208,37 @@ public:
 
     RTIMUSettings(const char *settingsDirectory, const char *productType);
 
+    ~RTIMUSettings();
+
+    // HAL functions as a part of the settings - due to poor design :(
+    bool HALOpen();
+    void HALClose();
+
+    bool HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned char length,
+                 unsigned char *data, const char *errorMsg);    // normal read with register select
+    bool HALRead(unsigned char slaveAddr, unsigned char length,
+                 unsigned char *data, const char *errorMsg);    // read without register select
+    bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
+                  unsigned char length, unsigned char const *data, const char *errorMsg);
+    bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
+                  unsigned char const data, const char *errorMsg);
+
+    void delayMs(int milliSeconds);
+
+    bool busIsI2C()
+    {
+        return m_hal->m_busIsI2C;
+    }
+
+    RTIMUHal *hal()
+    {
+        return m_hal;
+    }
+
     //  This function tries to find an IMU. It stops at the first valid one
     //  and returns true or else false
 
-    bool discoverIMU(int& imuType, bool& busIsI2C, unsigned char& slaveAddress);
+    bool discoverIMU();
 
     //  This function tries to find a pressure sensor. It stops at the first valid one
     //  and returns true or else false
@@ -375,6 +402,8 @@ private:
     void setValue(const char *key, const bool val);
     void setValue(const char *key, const int val);
     void setValue(const char *key, const RTFLOAT val);
+
+    RTIMUHal *m_hal;
 
     char m_filename[256];                                    // the settings file name
 
