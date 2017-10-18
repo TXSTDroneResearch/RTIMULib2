@@ -177,7 +177,7 @@ protected:
     RTFusion *m_fusion;                                     // the fusion algorithm
 
     int m_sampleRate;                                       // samples per second
-    uint64_t m_sampleInterval;                              // interval between samples in microseonds
+    uint64_t m_sampleInterval;                              // interval between samples in microseconds
 
     RTFLOAT m_gyroLearningAlpha;                            // gyro bias rapid learning rate
     RTFLOAT m_gyroContinuousAlpha;                          // gyro bias continuous (slow) learning rate

@@ -314,6 +314,11 @@ int RTIMUHal::ifWrite(unsigned char *data, unsigned char length)
         return write(m_I2C, data, length);
 #endif  // __linux__
     } else {
+        if (m_SPI == -1) {
+            HAL_ERROR("Attempted to write with unopened device!\n");
+            return -1;
+        }
+
         if (m_SPIBus >= 8) {
             // FTDI write.
             FT_STATUS status;
@@ -344,7 +349,7 @@ int RTIMUHal::ifWrite(unsigned char *data, unsigned char length)
     return -1;
 }
 
-bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned char length, unsigned char *data,
+bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char regAddr, uint16_t length, unsigned char *data,
                        const char *errorMsg)
 {
     if (m_busIsI2C) {
@@ -391,16 +396,23 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned 
         memset(rxBuff + 1, 0, length);
 
         if (m_SPIBus >= 8) {
-            FT_STATUS status;
+            FT_STATUS status = FT_OK;
             uint32 size_transferred = 0;
 
-            // SPI reads are done by transferring a reg address and junk for the expected return length.
-            status = SPI_ReadWrite((FT_HANDLE *)m_SPI, rxBuff, rxBuff, length + 1, &size_transferred,
-                                   SPI_TRANSFER_OPTIONS_SIZE_IN_BYTES | SPI_TRANSFER_OPTIONS_CHIPSELECT_ENABLE |
-                                       SPI_TRANSFER_OPTIONS_CHIPSELECT_DISABLE);
-            if (!FT_SUCCESS(status)) {
-                HAL_ERROR3("FTDI SPI read error (%d, reg %.2X, %s)", status, regAddr, errorMsg);
-                return false;
+            status = SPI_Write((FT_HANDLE *)m_SPI, rxBuff, 1, &size_transferred,
+                               SPI_TRANSFER_OPTIONS_SIZE_IN_BYTES | SPI_TRANSFER_OPTIONS_CHIPSELECT_ENABLE);
+
+            size_transferred = 0;
+
+            // One call to SPI_ReadWrite may not transfer the entire requested length. So we repeat the call.
+            while (size_transferred != length) {
+                // SPI reads are done by transferring a reg address and junk for the expected return length.
+                status = SPI_Read((FT_HANDLE *)m_SPI, rxBuff + 1, length, &size_transferred,
+                                  SPI_TRANSFER_OPTIONS_SIZE_IN_BYTES | SPI_TRANSFER_OPTIONS_CHIPSELECT_DISABLE);
+                if (!FT_SUCCESS(status)) {
+                    HAL_ERROR3("FTDI SPI read error (%d, reg %.2X, %s)", status, regAddr, errorMsg);
+                    return false;
+                }
             }
         } else {
 #ifdef __linux__
@@ -424,7 +436,7 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned 
     return true;
 }
 
-bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char length, unsigned char *data, const char *errorMsg)
+bool RTIMUHal::HALRead(unsigned char slaveAddr, uint16_t length, unsigned char *data, const char *errorMsg)
 {
     if (m_busIsI2C) {
         int tries, result, total;

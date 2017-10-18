@@ -27,14 +27,18 @@
 #include "RTIMUMPU9255.h"
 #include "RTIMUSettings.h"
 
-RTIMUMPU9255::RTIMUMPU9255(RTIMUSettings *settings) : RTIMU(settings) {}
+RTIMUMPU9255::RTIMUMPU9255(RTIMUSettings *settings) : RTIMU(settings) { m_deviceOpen = false; }
 
 RTIMUMPU9255::~RTIMUMPU9255()
 {
-    //  reset the MPU9255 and shut down
-    m_settings->HALWrite(m_slaveAddr, MPU9255_PWR_MGMT_1, MPU9255_PWR_MGMT_1_H_RESET,
-                         "Failed to initiate MPU9255 reset");
-    m_settings->HALClose();
+    if (m_deviceOpen) {
+        //  reset the MPU9255 and shut down
+        m_settings->HALWrite(m_slaveAddr, MPU9255_PWR_MGMT_1, MPU9255_PWR_MGMT_1_H_RESET,
+                             "Failed to initiate MPU9255 reset");
+        m_settings->HALClose();
+
+        m_deviceOpen = false;
+    }
 }
 
 bool RTIMUMPU9255::setSampleRate(int rate)
@@ -208,9 +212,9 @@ bool RTIMUMPU9255::IMUInit()
     setCalibrationData();
 
     // reset registers
-    m_fifoEna = 0;
+    m_fifoEna = MPU9255_FIFO_EN_GYRO_ALL | MPU9255_FIFO_EN_ACCEL | MPU9255_FIFO_EN_SLV_0;
     m_interruptCfg = 0;
-    m_interruptEna = 0;
+    m_interruptEna = MPU9255_INT_ENABLE_RAW_RDY_EN;
     m_userControl = 0;
 
     //  enable the bus
@@ -235,23 +239,29 @@ bool RTIMUMPU9255::IMUInit()
         return false;
     }
 
+    m_deviceOpen = true;
+    
     //  now configure the various components
 
-    if (!setGyroConfig())
-        return false;
-
-    if (!setAccelConfig())
-        return false;
-
-    if (!setSampleRate())
-        return false;
-
-    if(!compassSetup()) {
+    if (!setGyroConfig()) {
         return false;
     }
 
-    if (!setCompassRate())
+    if (!setAccelConfig()) {
         return false;
+    }
+
+    if (!setSampleRate()) {
+        return false;
+    }
+
+    if (!compassSetup()) {
+        return false;
+    }
+
+    if (!setCompassRate()) {
+        return false;
+    }
 
     //  enable the sensors
 
@@ -260,7 +270,7 @@ bool RTIMUMPU9255::IMUInit()
         return false;
 
     if (!m_settings->HALWrite(m_slaveAddr, MPU9255_PWR_MGMT_2, 0, "Failed to set pwr_mgmt_2"))
-         return false;
+        return false;
 
     //  select the data to go into the FIFO and enable
 
@@ -282,6 +292,7 @@ bool RTIMUMPU9255::resetFifo()
     if (!m_settings->HALWrite(m_slaveAddr, MPU9255_USER_CTRL, 0, "Reset user control"))
         return false;
 
+    // Disable the FIFO and reset it.
     m_userControl &= ~MPU9255_USER_CTRL_FIFO_EN;
     if (!m_settings->HALWrite(m_slaveAddr, MPU9255_USER_CTRL, m_userControl | MPU9255_USER_CTRL_FIFO_RST, "Resetting fifo"))
         return false;
@@ -292,11 +303,11 @@ bool RTIMUMPU9255::resetFifo()
 
     m_settings->delayMs(50);
 
-    m_interruptEna |= MPU9255_INT_ENABLE_RAW_RDY_EN;
+    // Rewrite our enabled interrupts config
     if (!m_settings->HALWrite(m_slaveAddr, MPU9255_INT_ENABLE, m_interruptEna, "Writing int enable"))
         return false;
 
-    m_fifoEna = MPU9255_FIFO_EN_GYRO_ALL | MPU9255_FIFO_EN_ACCEL | MPU9255_FIFO_EN_SLV_0;
+    // Rewrite our enabled fifo config
     if (!m_settings->HALWrite(m_slaveAddr, MPU9255_FIFO_EN, m_fifoEna, "Failed to set FIFO enables"))
         return false;
 
@@ -511,23 +522,28 @@ int RTIMUMPU9255::IMUGetPollInterval()
 bool RTIMUMPU9255::IMURead()
 {
     uint32_t count;
-    uint8_t fifoCount[2];
+    uint16_t fifoCount;
     uint8_t fifoData[MPU9255_FIFO_MAX_CHUNK_SIZE];
     uint32_t chunkSize = 0;
 
-    if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_COUNT_H, 2, fifoCount, "Failed to read fifo count"))
-         return false;
+    if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_COUNT_H, 2, (uint8_t *)&fifoCount, "Failed to read fifo count"))
+        return false;
 
-    count = ((unsigned int)fifoCount[0] << 8) + fifoCount[1];
+    // Byteswap the count to little endian.
+    count = ((fifoCount & 0xFF00) >> 8) + ((fifoCount & 0x00FF) << 8);
 
     // "The MPU-9255 contains a 512-byte FIFO register"
-    if (count >= 512) {
-        HAL_INFO("MPU-9255 fifo has overflowed\n");
+    // High-water mark, flush the fifo.
+    if (count >= 448) {
+        HAL_INFO("Flush MPU-9255 fifo\n");
         m_imuData.timestamp += m_sampleInterval * (512 / MPU9255_FIFO_MAX_CHUNK_SIZE + 1);  // try to fix timestamp
-
-        // We need to reset the FIFO, because data may have been written out-of-alignment,
-        // which will cause us to read garbage :(
         resetFifo();
+
+        // Flush the internal cache as well.
+        m_cacheCount = 0;
+        m_cacheIn = 0;
+        m_cacheOut = 0;
+
         return false;
     }
 
@@ -543,7 +559,7 @@ bool RTIMUMPU9255::IMURead()
         chunkSize += MPU9255_TEMP_CHUNK_SIZE;
     }
     if ((m_fifoEna & MPU9255_FIFO_EN_GYRO_ALL) == MPU9255_FIFO_EN_GYRO_ALL) {
-        chunkSize += MPU9255_GYRO_CHUNK_SIZE;
+        chunkSize += MPU9255_GYRO_ALL_CHUNK_SIZE;
     }
     if (m_fifoEna & MPU9255_FIFO_EN_SLV_0) {
         chunkSize += MPU9255_COMPASS_CHUNK_SIZE;
@@ -556,6 +572,9 @@ bool RTIMUMPU9255::IMURead()
             return false;
     } else {
         if (count >= (MPU9255_CACHE_SIZE * chunkSize)) {
+            int blockCount = count / chunkSize;  // number of chunks in fifo
+
+            // High amount of data in the fifo - append it to the cache
             if (m_cacheCount == MPU9255_CACHE_BLOCK_COUNT) {
                 // all cache blocks are full - discard oldest and update timestamp to account for lost samples
                 m_imuData.timestamp += m_sampleInterval * m_cache[m_cacheOut].count;
@@ -564,8 +583,7 @@ bool RTIMUMPU9255::IMURead()
                 m_cacheCount--;
             }
 
-            int blockCount = count / chunkSize;  // number of chunks in fifo
-
+            // Clamp it down.
             if (blockCount > MPU9255_CACHE_SIZE)
                 blockCount = MPU9255_CACHE_SIZE;
 
@@ -582,7 +600,6 @@ bool RTIMUMPU9255::IMURead()
         }
 
         //  now fifo has been read if necessary, get something to process
-
         if (m_cacheCount == 0)
             return false;
 
@@ -628,7 +645,7 @@ bool RTIMUMPU9255::IMURead()
     }
     if (m_fifoEna & MPU9255_FIFO_EN_GYRO_ALL == MPU9255_FIFO_EN_GYRO_ALL) {
         RTMath::convertToVector(fifoData + fifoOffset, m_imuData.gyro, m_gyroScale, true);
-        fifoOffset += MPU9255_GYRO_CHUNK_SIZE;
+        fifoOffset += MPU9255_GYRO_ALL_CHUNK_SIZE;
     }
     if (m_fifoEna & MPU9255_FIFO_EN_SLV_0) {
         // Compass

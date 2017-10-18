@@ -80,15 +80,15 @@ bool RTIMUSettings::HALOpen() { return m_hal->HALOpen(); }
 
 void RTIMUSettings::HALClose() { return m_hal->HALClose(); }
 
-bool RTIMUSettings::HALRead(unsigned char slaveAddr, unsigned char regAddr,
-                            unsigned char length, unsigned char *data,
-                            const char *errorMsg) {
-  return m_hal->HALRead(slaveAddr, regAddr, length, data, errorMsg);
+bool RTIMUSettings::HALRead(unsigned char slaveAddr, unsigned char regAddr, uint16_t length, unsigned char *data,
+                            const char *errorMsg)
+{
+    return m_hal->HALRead(slaveAddr, regAddr, length, data, errorMsg);
 }
 
-bool RTIMUSettings::HALRead(unsigned char slaveAddr, unsigned char length,
-                            unsigned char *data, const char *errorMsg) {
-  return m_hal->HALRead(slaveAddr, length, data, errorMsg);
+bool RTIMUSettings::HALRead(unsigned char slaveAddr, uint16_t length, unsigned char *data, const char *errorMsg)
+{
+    return m_hal->HALRead(slaveAddr, length, data, errorMsg);
 }
 
 bool RTIMUSettings::HALWrite(unsigned char slaveAddr, unsigned char regAddr,

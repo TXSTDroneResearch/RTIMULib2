@@ -214,9 +214,9 @@ public:
     bool HALOpen();
     void HALClose();
 
-    bool HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned char length,
+    bool HALRead(unsigned char slaveAddr, unsigned char regAddr, uint16_t length,
                  unsigned char *data, const char *errorMsg);    // normal read with register select
-    bool HALRead(unsigned char slaveAddr, unsigned char length,
+    bool HALRead(unsigned char slaveAddr, uint16_t length,
                  unsigned char *data, const char *errorMsg);    // read without register select
     bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
                   unsigned char length, unsigned char const *data, const char *errorMsg);

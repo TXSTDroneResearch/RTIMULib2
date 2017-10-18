@@ -257,6 +257,13 @@
 
 //  Register map
 
+#define MPU9255_SELF_TEST_X_GYRO    0x00
+#define MPU9255_SELF_TEST_Y_GYRO    0x01
+#define MPU9255_SELF_TEST_Z_GYRO    0x02
+
+#define MPU9255_SELF_TEST_X_ACCEL   0x0D
+#define MPU9255_SELF_TEST_Y_ACCEL   0x0E
+#define MPU9255_SELF_TEST_Z_ACCEL   0x0F
 #define MPU9255_SMPLRT_DIV          0x19
 #define MPU9255_CONFIG              0x1a
 #define MPU9255_GYRO_CONFIG         0x1b
@@ -292,8 +299,13 @@
 #define MPU9255_GYRO_ZOUT_H         0x47
 #define MPU9255_GYRO_ZOUT_L         0x48
 #define MPU9255_EXT_SENS_DATA_00    0x49
+#define MPU9255_I2C_SLV0_DO         0x63
 #define MPU9255_I2C_SLV1_DO         0x64
+#define MPU9255_I2C_SLV2_DO         0x65
+#define MPU9255_I2C_SLV3_DO         0x66
 #define MPU9255_I2C_MST_DELAY_CTRL  0x67
+#define MPU9255_SIGNAL_PATH_RESET   0x68
+#define MPU9255_MOT_DETECT_CTRL     0x69
 #define MPU9255_USER_CTRL           0x6a
 #define MPU9255_PWR_MGMT_1          0x6b
 #define MPU9255_PWR_MGMT_2          0x6c

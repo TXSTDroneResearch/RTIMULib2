@@ -38,7 +38,7 @@
 
 #define MPU9255_ACCEL_CHUNK_SIZE    6
 #define MPU9255_TEMP_CHUNK_SIZE     2
-#define MPU9255_GYRO_CHUNK_SIZE     6
+#define MPU9255_GYRO_ALL_CHUNK_SIZE 6
 #define MPU9255_COMPASS_CHUNK_SIZE  6
 
 #define MPU9255_FIFO_MAX_CHUNK_SIZE 20
@@ -95,6 +95,7 @@ private:
     bool bypassOn();
     bool bypassOff();
 
+    bool m_deviceOpen;                                      // if device is open
     bool m_firstTime;                                       // if first sample
 
     unsigned char m_slaveAddr;                              // I2C address of MPU9150

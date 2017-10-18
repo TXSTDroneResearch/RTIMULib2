@@ -63,8 +63,8 @@
 
 #endif
 
-#define MAX_WRITE_LEN                   255
-#define MAX_READ_LEN                    255
+#define MAX_WRITE_LEN                   512
+#define MAX_READ_LEN                    512
 
 class RTIMUHal
 {
@@ -82,14 +82,14 @@ public:
 
     virtual bool HALOpen();
     virtual void HALClose();
-    virtual bool HALRead(unsigned char slaveAddr, unsigned char regAddr, unsigned char length,
-                         unsigned char *data, const char *errorMsg);    // normal read with register select
-    virtual bool HALRead(unsigned char slaveAddr, unsigned char length,
-                         unsigned char *data, const char *errorMsg);    // read without register select
-    virtual bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
-                          unsigned char length, unsigned char const *data, const char *errorMsg);
-    virtual bool HALWrite(unsigned char slaveAddr, unsigned char regAddr,
-                          unsigned char const data, const char *errorMsg);
+    virtual bool HALRead(unsigned char slaveAddr, unsigned char regAddr, uint16_t length, unsigned char *data,
+                         const char *errorMsg);  // normal read with register select
+    virtual bool HALRead(unsigned char slaveAddr, uint16_t length, unsigned char *data,
+                         const char *errorMsg);  // read without register select
+    virtual bool HALWrite(unsigned char slaveAddr, unsigned char regAddr, unsigned char length,
+                          unsigned char const *data, const char *errorMsg);
+    virtual bool HALWrite(unsigned char slaveAddr, unsigned char regAddr, unsigned char const data,
+                          const char *errorMsg);
 
     void delayMs(int milliSeconds);
 
