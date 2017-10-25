@@ -195,7 +195,7 @@ bool RTIMUMPU9255::IMUInit()
     m_imuData.accelValid = true;
     m_imuData.compassValid = true;
     m_imuData.pressureValid = false;
-    m_imuData.temperatureValid = false;
+    m_imuData.temperatureValid = true;
     m_imuData.humidityValid = false;
 
     //  configure IMU
@@ -212,7 +212,7 @@ bool RTIMUMPU9255::IMUInit()
     setCalibrationData();
 
     // reset registers
-    m_fifoEna = MPU9255_FIFO_EN_GYRO_ALL | MPU9255_FIFO_EN_ACCEL | MPU9255_FIFO_EN_SLV_0;
+    m_fifoEna = MPU9255_FIFO_EN_TEMP_OUT | MPU9255_FIFO_EN_GYRO_ALL | MPU9255_FIFO_EN_ACCEL | MPU9255_FIFO_EN_SLV_0;
     m_interruptCfg = 0;
     m_interruptEna = MPU9255_INT_ENABLE_RAW_RDY_EN;
     m_userControl = 0;
@@ -640,7 +640,8 @@ bool RTIMUMPU9255::IMURead()
         fifoOffset += MPU9255_ACCEL_CHUNK_SIZE;
     }
     if (m_fifoEna & MPU9255_FIFO_EN_TEMP_OUT) {
-        // Temp probe would go here...
+        uint16_t temp_raw = (*(fifoData + fifoOffset) << 8) | (*(fifoData + fifoOffset));
+        m_imuData.temperature = ((temp_raw) / 338.87) + 21;
         fifoOffset += MPU9255_TEMP_CHUNK_SIZE;
     }
     if (m_fifoEna & MPU9255_FIFO_EN_GYRO_ALL == MPU9255_FIFO_EN_GYRO_ALL) {
