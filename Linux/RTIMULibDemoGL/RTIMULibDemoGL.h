@@ -129,6 +129,7 @@ private:
 
     int m_rateTimer;
     int m_displayTimer;
+    int m_viewTimer;
 
     int m_sampleCount;
 };

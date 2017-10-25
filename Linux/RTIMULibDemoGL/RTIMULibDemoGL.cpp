@@ -79,6 +79,7 @@ RTIMULibDemoGL::RTIMULibDemoGL()
     //  Only update the display 10 times per second to keep CPU reasonable
 
     m_displayTimer = startTimer(100);
+    m_viewTimer = startTimer(5);  // Update the GL view every 5ms
 
     m_fusionType->setText(RTFusion::fusionName(m_imuThread->getSettings()->m_fusionType));
 }
@@ -174,6 +175,7 @@ void RTIMULibDemoGL::onEnableDebug(int state)
 void RTIMULibDemoGL::closeEvent(QCloseEvent *)
 {
     killTimer(m_displayTimer);
+    killTimer(m_viewTimer);
     killTimer(m_rateTimer);
     m_imuThread->exitThread();
 }
@@ -234,7 +236,7 @@ void RTIMULibDemoGL::timerEvent(QTimerEvent *event)
             m_accelResidualY->setText(QString::number(residuals.y(), 'f', 6));
             m_accelResidualZ->setText(QString::number(residuals.z(), 'f', 6));
         }
-
+    } else if (event->timerId() == m_viewTimer) {
         int index;
         RTVector3 vec;
 
@@ -242,32 +244,31 @@ void RTIMULibDemoGL::timerEvent(QTimerEvent *event)
             m_view->updateIMU(m_imuData.fusionPose);
         } else {
             switch (m_displaySelect->itemData(index).toInt()) {
-            case DISPLAY_MEASURED:
-                if (m_imuThread->getIMU() != NULL) {
-                    measuredPose = m_imuThread->getIMU()->getMeasuredPose();
-                    m_view->updateIMU(measuredPose);
-                }
-                break;
+                case DISPLAY_MEASURED:
+                    if (m_imuThread->getIMU() != NULL) {
+                        measuredPose = m_imuThread->getIMU()->getMeasuredPose();
+                        m_view->updateIMU(measuredPose);
+                    }
+                    break;
 
-            case DISPLAY_ACCELONLY:
-                m_imuData.accel.accelToEuler(vec);
-                m_view->updateIMU(vec);
-                break;
+                case DISPLAY_ACCELONLY:
+                    m_imuData.accel.accelToEuler(vec);
+                    m_view->updateIMU(vec);
+                    break;
 
-            case DISPLAY_COMPASSONLY:
-                vec = RTMath::poseFromAccelMag(m_imuData.accel, m_imuData.compass);
-                vec.setX(0);
-                vec.setY(0);
-                m_view->updateIMU(vec);
-                break;
+                case DISPLAY_COMPASSONLY:
+                    vec = RTMath::poseFromAccelMag(m_imuData.accel, m_imuData.compass);
+                    vec.setX(0);
+                    vec.setY(0);
+                    m_view->updateIMU(vec);
+                    break;
 
-            default:
-                m_view->updateIMU(m_imuData.fusionPose);
-                break;
+                default:
+                    m_view->updateIMU(m_imuData.fusionPose);
+                    break;
             }
         }
     } else {
-
         //  Update the sample rate
 
         float rate = (float)m_sampleCount / (float(RATE_TIMER_INTERVAL));
