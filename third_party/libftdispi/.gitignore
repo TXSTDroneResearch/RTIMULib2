@@ -1,0 +1,11 @@
+.scon*
+config.log
+bin/*
+lib/*
+*.o
+*.os
+doc/html
+doc/man
+*.pyc
+*.pyo
+

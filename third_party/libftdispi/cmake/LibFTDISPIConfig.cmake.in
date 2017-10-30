@@ -1,0 +1,17 @@
+# - Try to find FTDI-SPI
+# Once found, this will define:
+#   LIBFTDISPI_FOUND - System has libftdispi
+#   LIBFTDISPI_INCLUDE_DIRS - The libftdispi include directories
+#   LIBFTDISPI_LIBRARIES - Libraries required to use libftdispi
+
+find_path(LIBFTDISPI_INCLUDE_DIR libftdispi/ftdispi.h)
+find_library(LIBFTDISPI_LIBRARY ftdispi)
+
+include(FindPackageHandleStandardArgs)
+# Handle QUIETLY/REQUIRED arguments
+find_package_handle_standard_args(LibFTDISPI DEFAULT_MSG LIBFTDISPI_LIBRARY LIBFTDISPI_INCLUDE_DIR)
+
+mark_as_advanced(LIBFTDISPI_INCLUDE_DIR LIBFTDISPI_LIBRARY)
+
+set(LIBFTDISPI_LIBRARIES ${LIBFTDISPI_LIBRARY})
+set(LIBFTDISPI_INCLUDE_DIRS ${LIBFTDISPI_INCLUDE_DIR})
