@@ -93,7 +93,7 @@ static int ftdispi_wait(struct ftdispi_context *fsc, uint8_t mask,
 			uint8_t value, int maxtry);
 
 __dll int ftdispi_open(struct ftdispi_context *fsc,
-		       struct ftdi_context *fc, int interface)
+		       struct ftdi_context *fc, int interface, uint8_t latency)
 {
 	ASSERT_CHECK(!fc || !fsc, "CTX NOT INITIALIZED", FTDISPI_ERROR_CTX);
 	memset(fsc, 0, sizeof(*fsc));
@@ -106,7 +106,7 @@ __dll int ftdispi_open(struct ftdispi_context *fsc,
 	FTDI_CHECK(ftdi_set_interface(&fsc->fc, interface), "SET INT",
 		   fsc->fc);
 	FTDI_CHECK(ftdi_usb_reset(&fsc->fc), "RESET", fsc->fc);
-	FTDI_CHECK(ftdi_set_latency_timer(&fsc->fc, 2), "SET LAT 2ms", fsc->fc);
+	FTDI_CHECK(ftdi_set_latency_timer(&fsc->fc, latency), "SET LAT", fsc->fc);
 	FTDI_CHECK(ftdi_setflowctrl(&fsc->fc, SIO_RTS_CTS_HS), "RTS/CTS",
 		   fsc->fc);
 	/*FTDI_CHECK(ftdi_set_bitmode(&fsc->fc, 0, 0), "RESET MPSSE", fsc->fc); */
@@ -114,6 +114,7 @@ __dll int ftdispi_open(struct ftdispi_context *fsc,
 		   fsc->fc);
 	fsc->wr_cmd = MPSSE_DO_WRITE;
 	fsc->rd_cmd = MPSSE_DO_READ | MPSSE_READ_NEG;
+	fsc->tx_cmd = MPSSE_DO_WRITE | MPSSE_DO_READ | MPSSE_READ_NEG;
 	fsc->bitini = BIT_P_CS;
 
 	FTDI_CHECK(ftdi_usb_purge_buffers(&fsc->fc), "PURGE", fsc->fc);
@@ -180,6 +181,7 @@ __dll int ftdispi_setmode(struct ftdispi_context *fsc,
 	ASSERT_CHECK(!fsc, "CTX NOT INITIALIZED", FTDISPI_ERROR_CTX);
 	fsc->wr_cmd = MPSSE_DO_WRITE | (bitmode ? MPSSE_BITMODE : 0);
 	fsc->rd_cmd = MPSSE_DO_READ | (bitmode ? MPSSE_BITMODE : 0);
+	fsc->tx_cmd = MPSSE_DO_WRITE | MPSSE_DO_READ | (bitmode ? MPSSE_BITMODE : 0);
 	fsc->bitini = (csh ? BIT_P_CS : 0) | (BIT_P_GX & gpoini);
 
 	if (!cpol) {
@@ -187,9 +189,11 @@ __dll int ftdispi_setmode(struct ftdispi_context *fsc,
 		if (!cpha) {
 			/* W=FE R=RE => NO TX */
 			fsc->wr_cmd |= MPSSE_WRITE_NEG;
+			fsc->tx_cmd |= MPSSE_WRITE_NEG;
 		} else {
 			/* W=RE R=FE > RX OPT */
 			fsc->rd_cmd |= MPSSE_READ_NEG;
+			fsc->tx_cmd |= MPSSE_READ_NEG;
 		}
 	} else {
 		/* CLK IDLE == 1 */
@@ -197,17 +201,21 @@ __dll int ftdispi_setmode(struct ftdispi_context *fsc,
 		if (!cpha) {
 			/* W=RE R=FE => NO TX */
 			fsc->rd_cmd |= MPSSE_READ_NEG;
+			fsc->tx_cmd |= MPSSE_READ_NEG;
 		} else {
 			/* W=FE R=RE => RX OPT */
 			fsc->wr_cmd |= MPSSE_WRITE_NEG;
+			fsc->tx_cmd |= MPSSE_WRITE_NEG;
 		}
 	}
 	if (lsbfirst) {
 		fsc->wr_cmd |= MPSSE_LSB;
 		fsc->rd_cmd |= MPSSE_LSB;
+		fsc->tx_cmd |= MPSSE_LSB;
 	} else {
 		fsc->wr_cmd &= ~MPSSE_LSB;
 		fsc->rd_cmd &= ~MPSSE_LSB;
+		fsc->tx_cmd &= ~MPSSE_LSB;
 	}
 
 	buf[0] = SET_BITS_LOW;
@@ -235,38 +243,68 @@ __dll int ftdispi_write_read(struct ftdispi_context *fsc,
 	n = wcount + (rcount ? 9 : 6);
 	ASSERT_CHECK(ftdispi_realloc(fsc, n), "REALLOC", FTDISPI_ERROR_MEM);
 
+	/* invert chip select */
 	i = 0;
 	fsc->mem[i++] = SET_BITS_LOW;
 	fsc->mem[i++] = ((0x0F & (fsc->bitini ^ BIT_P_CS)) | (BIT_P_GX & gpo));
 	fsc->mem[i++] = BIT_DIR;
+	FTDI_CHECK(ftdi_write_data(&fsc->fc, fsc->mem, i), "WR", fsc->fc);
 
-	if (wcount && wbuf) {
-		fsc->mem[i++] = fsc->wr_cmd;
-		fsc->mem[i++] = (wcount - 1) & 0xFF;
-		fsc->mem[i++] = ((wcount - 1) >> 8) & 0xFF;
+	i = 0;
+	if (wcount && wbuf && rcount && rbuf && (rcount == wcount)) {
+		/* reading and writing the same amount of data */
+		fsc->mem[i++] = fsc->tx_cmd;
+		fsc->mem[i++] = ((wcount - 1) & 0x00FF);
+		fsc->mem[i++] = ((wcount - 1) & 0xFF00) >> 8;
 		memcpy(fsc->mem + i, wbuf, wcount);
 		i += wcount;
-	}
-	if (rcount && rbuf) {
-		fsc->mem[i++] = fsc->rd_cmd;
-		fsc->mem[i++] = (rcount - 1) & 0xFF;
-		fsc->mem[i++] = ((rcount - 1) >> 8) & 0xFF;
-		FTDI_CHECK(ftdi_write_data(&fsc->fc, fsc->mem, i), "[WR]RD",
-			   fsc->fc);
+
+		FTDI_CHECK(ftdi_write_data(&fsc->fc, fsc->mem, i), "WR", fsc->fc);
+		i = 0;
+
 		for (n = 0; n < rcount;) {
-			FTDI_CHECK(r =
-				   ftdi_read_data(&fsc->fc, rbuf + n,
-						  rcount - n), "RD", fsc->fc);
+			FTDI_CHECK(r = ftdi_read_data(&fsc->fc, rbuf + n, rcount - n), "RD",
+					fsc->fc);
 			n += r;
 		}
-		i = 0;
+	} else {
+		if (wcount && wbuf) {
+			fsc->mem[i++] = fsc->wr_cmd;
+			fsc->mem[i++] = (wcount - 1) & 0xFF;
+			fsc->mem[i++] = ((wcount - 1) >> 8) & 0xFF;
+			memcpy(fsc->mem + i, wbuf, wcount);
+			i += wcount;
+
+			FTDI_CHECK(ftdi_write_data(&fsc->fc, fsc->mem, i), "WR", fsc->fc);
+			i = 0;
+		}
+		if (rcount && rbuf) {
+			fsc->mem[i++] = fsc->rd_cmd;
+			fsc->mem[i++] = (rcount - 1) & 0xFF;
+			fsc->mem[i++] = ((rcount - 1) >> 8) & 0xFF;
+
+			FTDI_CHECK(ftdi_write_data(&fsc->fc, fsc->mem, i), "RD", fsc->fc);
+			for (n = 0; n < rcount;) {
+				FTDI_CHECK(r =
+					ftdi_read_data(&fsc->fc, rbuf + n,
+							rcount - n), "RD", fsc->fc);
+				n += r;
+			}
+			i = 0;
+		}
 	}
+
+	/* reset chip select */
 	fsc->mem[i++] = SET_BITS_LOW;
 	fsc->mem[i++] = fsc->bitini;
 	fsc->mem[i++] = BIT_DIR;
 	FTDI_CHECK(ftdi_write_data(&fsc->fc, fsc->mem, i), "WR", fsc->fc);
 
-	return ftdispi_wait(fsc, BIT_P_CS, fsc->bitini, RETRY_MAX);
+	if ((r = ftdispi_wait(fsc, BIT_P_CS, fsc->bitini, RETRY_MAX)) < 0) {
+		return r;
+	}
+
+	return n;
 }
 
 __dll int ftdispi_write(struct ftdispi_context *fsc,
@@ -330,14 +368,19 @@ static int ftdispi_wait(struct ftdispi_context *fsc, uint8_t mask,
 {
 	uint8_t cmd = GET_BITS_LOW;
 	uint8_t ret = 0;
+	int r;
 
-	FTDI_CHECK(ftdi_write_data(&fsc->fc, &cmd, 1), "GBLW", fsc->fc);
-	FTDI_CHECK(ftdi_read_data(&fsc->fc, &ret, 1), "GBLR", fsc->fc);
-	while (maxtry-- && (ret & mask) != (value & mask)) {
-		usleep(RETRY_TIME);
+	do {
 		FTDI_CHECK(ftdi_write_data(&fsc->fc, &cmd, 1), "GBLW", fsc->fc);
-		FTDI_CHECK(ftdi_read_data(&fsc->fc, &ret, 1), "GBLR", fsc->fc);
-	}
+
+		do {
+			/* loop until we receive the data */
+			FTDI_CHECK(r = ftdi_read_data(&fsc->fc, &ret, 1), "GBLR", fsc->fc);
+			usleep(RETRY_TIME);
+		} while (r == 0);
+
+		usleep(RETRY_TIME);
+	} while (maxtry-- && (ret & mask) != (value & mask));
 
 	if ((ret & mask) == (value & mask)) {
 		return FTDISPI_ERROR_NONE;

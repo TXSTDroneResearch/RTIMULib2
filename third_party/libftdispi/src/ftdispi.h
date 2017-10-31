@@ -95,6 +95,7 @@ extern "C" {
 		/**< @brief ftdi context */
 		uint8_t wr_cmd;	 /**< @brief write command */
 		uint8_t rd_cmd;	 /**< @brief read command */
+		uint8_t tx_cmd;  /**< @brief transfer command */
 		uint8_t bitini;	 /**< @brief initial states of all bits */
 		uint8_t *mem;	 /**< @brief memory region for write and read
                                   * functions */
@@ -108,6 +109,7 @@ extern "C" {
  * @param[in,out] fsc the spi context to open
  * @param[in] fc a previously opened usb ftdi device
  * @param[in] interface the interface to use
+ * @param[in] latency the value of the latency timer. if unsure, use 2.
  *
  * @retval #FTDISPI_ERROR_NONE on success
  * @retval #FTDISPI_ERROR_CTX on context error
@@ -118,7 +120,7 @@ extern "C" {
  */
 	__dll int
 	ftdispi_open(struct ftdispi_context *fsc,
-		     struct ftdi_context *fc, int interface);
+		     struct ftdi_context *fc, int interface, uint8_t latency);
 
 /**
  * @brief Set the mode for future SPI operations. Returns only when
@@ -184,7 +186,7 @@ extern "C" {
  * @brief set the loopback for TDI/DO TDO/DI
  *
  * @param[in,out] fsc previously opened spi contex
- * @param[in] active set to 0 to diable loopback
+ * @param[in] active set to 0 to disable loopback
  *
  * @retval #FTDISPI_ERROR_NONE on success
  * @retval #FTDISPI_ERROR_CTX on context error
@@ -206,7 +208,7 @@ extern "C" {
  * @param[in] gpo general purpose output states for the duration of
  * the operation
  *
- * @retval #FTDISPI_ERROR_NONE on success
+ * @retval size transferred on success (>=0)
  * @retval #FTDISPI_ERROR_CTX on context error
  * @retval #FTDISPI_ERROR_LIB on libftdi error
  * @retval #FTDISPI_ERROR_MEM on allocation error

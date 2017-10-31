@@ -35,7 +35,7 @@ int main(int argc, char **argv)
 
 	rbuf[0] = 0x75 | 0x80;
 
-	ftdispi_open(&fsc, &fc, INTERFACE_A);
+	ftdispi_open(&fsc, &fc, INTERFACE_A, 2);
 	ftdispi_setmode(&fsc, 1, 0, 0, 0, 0, 0);
 	ftdispi_setclock(&fsc, 200000);
 	ftdispi_setloopback(&fsc, 0);
