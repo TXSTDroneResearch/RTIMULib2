@@ -29,7 +29,10 @@
 #include <linux/spi/spidev.h>
 #elif defined(_WIN32)
 #include <Windows.h>
+
+#ifndef _WINDOWS
 #define _WINDOWS
+#endif  // _ WINDOWS
 #endif
 
 #if !defined(WIN32) && !defined(__APPLE__)
@@ -42,31 +45,34 @@
 #include <unistd.h>
 #endif
 
+#ifdef RTHAL_MPSSE
 #include "third_party/libMPSSE/libMPSSE_spi.h"
+#elif defined(RTHAL_LIBFTDI)
+#include <libftdispi/ftdispi.h>
+#endif
 
 RTIMUHal::RTIMUHal()
 {
-#ifdef _WIN32
-    // HACK: Do the one-time init here.
-    Init_libMPSSE();
-#endif
-
     m_I2CBus = 255;
     m_SPIBus = 255;
     m_currentSlave = 255;
     m_I2C = -1;
     m_SPI = -1;
     m_SPISpeed = 500000;
+
+#if defined(RTHAL_MPSSE) && defined(_MSC_VER)
+    // HACK: Initialize MPSSE here.
+    Init_libMPSSE();
+#endif
 }
 
 RTIMUHal::~RTIMUHal()
 {
-#ifdef _WIN32
-    // HACK: Do the one-time cleanup here.
+    HALClose();
+
+#if defined(RTHAL_MPSSE) && defined(_MSC_VER)
     Cleanup_libMPSSE();
 #endif
-
-    HALClose();
 }
 
 bool RTIMUHal::HALOpen()
@@ -107,9 +113,10 @@ bool RTIMUHal::HALOpen()
         }
 
         if (m_SPIBus >= 8) {
+#ifdef RTHAL_MPSSE
             // Using libMPSSE.
             ChannelConfig channel_config = {0};
-            FT_DEVICE_LIST_INFO_NODE dev_list = {0};
+            FT_DEVICE_LIST_INFO_NODE chan_info = {0};
             FT_HANDLE handle;
             FT_STATUS status;
             uint32 channel = m_SPIBus - 8;
@@ -128,26 +135,26 @@ bool RTIMUHal::HALOpen()
                 }
             }
 
-            status = SPI_GetChannelInfo(channel, &dev_list);
+            status = SPI_GetChannelInfo(channel, &chan_info);
             if (FT_SUCCESS(status)) {
-                HAL_INFO1("Chosen FTDI SPI channel %d\n", channel);
-                HAL_INFO1("		Flags=0x%x\n", dev_list.Flags);
-                HAL_INFO1("		Type=0x%x\n", dev_list.Type);
-                HAL_INFO1("		ID=0x%x\n", dev_list.ID);
-                HAL_INFO1("		LocId=0x%x\n", dev_list.LocId);
-                HAL_INFO1("		SerialNumber=%s\n", dev_list.SerialNumber);
-                HAL_INFO1("		Description=%s\n", dev_list.Description);
-                HAL_INFO1("		ftHandle=0x%p\n", dev_list.ftHandle); /*is 0 unless open*/
+                HAL_INFO("Chosen FTDI SPI channel %d\n", channel);
+                HAL_INFO("		Flags=0x%x\n", chan_info.Flags);
+                HAL_INFO("		Type=0x%x\n", chan_info.Type);
+                HAL_INFO("		ID=0x%x\n", chan_info.ID);
+                HAL_INFO("		LocId=0x%x\n", chan_info.LocId);
+                HAL_INFO("		SerialNumber=%s\n", chan_info.SerialNumber);
+                HAL_INFO("		Description=%s\n", chan_info.Description);
+                HAL_INFO("		ftHandle=0x%p\n", chan_info.ftHandle); /*is 0 unless open*/
 
-                if (dev_list.ftHandle != NULL) {
-                    m_SPI = (uintptr_t)dev_list.ftHandle;
+                if (chan_info.ftHandle != NULL) {
+                    m_SPI = (uintptr_t)chan_info.ftHandle;
                     return true;
                 }
             }
 
             status = SPI_OpenChannel(channel, &handle);
             if (!FT_SUCCESS(status)) {
-                HAL_ERROR1("Failed to open FTDI channel (%d)\n", status);
+                HAL_ERROR("Failed to open FTDI channel (%d)\n", status);
                 return false;
             }
 
@@ -159,59 +166,135 @@ bool RTIMUHal::HALOpen()
             status = SPI_InitChannel(handle, &channel_config);
             if (!FT_SUCCESS(status)) {
                 SPI_CloseChannel(handle);
-                HAL_ERROR1("Failed to initialize SPI channel (%d)", status);
+                HAL_ERROR("Failed to initialize SPI channel (%d)", status);
                 return false;
             }
 
             // Successfully connected!
             m_SPI = (uintptr_t)handle;
+#elif defined(RTHAL_LIBFTDI)
+            // Using libftdispi
+            ftdi_context fc;
+            ftdispi_context *fsc;
+            ftdi_device_list *devlist;
+            int status;
+
+            status = ftdi_init(&fc);
+            if (status < 0) {
+                HAL_ERROR("Failed to allocate FTDI context\n");
+                return false;
+            }
+
+            ftdi_set_interface(&fc, INTERFACE_ANY);
+            if ((status = ftdi_usb_find_all(&fc, &devlist, 0, 0)) < 0) {
+                HAL_ERROR("Failed to search for usb FTDI chips: %d\n", status);
+                return false;
+            }
+
+            if (status == 0) {
+                HAL_ERROR("No FTDI devices found.\n");
+                return false;
+            }
+
+            status = ftdi_usb_open_dev(&fc, devlist[0].dev);
+            if (status < 0) {
+                HAL_ERROR("Failed to open device: %d (%s)\n", status, ftdi_get_error_string(&fc));
+                return false;
+            }
+
+            // After this point, fsc owns fc.
+            fsc = new ftdispi_context;
+            status = ftdispi_open(fsc, &fc, INTERFACE_ANY, 1);
+            if (status < 0) {
+                HAL_ERROR("Failed to open SPI device: %d\n", status);
+                delete fsc;
+                return false;
+            }
+
+            if (status >= 0) {
+                status = ftdispi_setmode(fsc, 1, 0, 0, 0, 0, 0);
+
+                if (status < 0) {
+                    HAL_ERROR("Failed to set SPI mode. ");
+                }
+            }
+
+            if (status >= 0) {
+                status = ftdispi_setclock(fsc, SPISpeed);
+
+                if (status < 0) {
+                    HAL_ERROR("Failed to set SPI clock. ");
+                }
+            }
+
+            if (status >= 0) {
+                ftdispi_setloopback(fsc, 0);
+
+                if (status < 0) {
+                    HAL_ERROR("Failed to set SPI loopback mode. ");
+                }
+            }
+
+            if (status < 0) {
+                HAL_ERROR("Code %d\n", status);
+                ftdispi_close(fsc, 1);
+                delete fsc;
+                return false;
+            }
+
+            // Successfully connected!
+            m_SPI = (uintptr_t)fsc;
+#endif
         } else {
 #ifdef __linux__
+            int bus = -1;
             unsigned char SPIMode = SPI_MODE_0;
 
             sprintf(buf, "/dev/spidev%d.%d", m_SPIBus, m_SPISelect);
-            m_SPI = open(buf, O_RDWR);
-            if (m_SPI < 0) {
+            bus = open(buf, O_RDWR);
+            if (bus < 0) {
                 HAL_ERROR2("Failed to open SPI bus %d, select %d\n", m_SPIBus, m_SPISelect);
                 m_SPI = -1;
                 return false;
             }
 
-            if (ioctl(m_SPI, SPI_IOC_WR_MODE, &SPIMode) < 0) {
+            if (ioctl(bus, SPI_IOC_WR_MODE, &SPIMode) < 0) {
                 HAL_ERROR2("Failed to set WR SPI_MODE0 on bus %d, select %d\n", m_SPIBus, m_SPISelect);
-                close(m_SPIBus);
+                close(bus);
                 return false;
             }
 
-            if (ioctl(m_SPI, SPI_IOC_RD_MODE, &SPIMode) < 0) {
+            if (ioctl(bus, SPI_IOC_RD_MODE, &SPIMode) < 0) {
                 HAL_ERROR2("Failed to set RD SPI_MODE0 on bus %d, select %d\n", m_SPIBus, m_SPISelect);
-                close(m_SPIBus);
+                close(bus);
                 return false;
             }
 
-            if (ioctl(m_SPI, SPI_IOC_WR_BITS_PER_WORD, &SPIBits) < 0) {
+            if (ioctl(bus, SPI_IOC_WR_BITS_PER_WORD, &SPIBits) < 0) {
                 HAL_ERROR2("Failed to set WR 8 bit mode on bus %d, select %d\n", m_SPIBus, m_SPISelect);
-                close(m_SPIBus);
+                close(bus);
                 return false;
             }
 
-            if (ioctl(m_SPI, SPI_IOC_RD_BITS_PER_WORD, &SPIBits) < 0) {
+            if (ioctl(bus, SPI_IOC_RD_BITS_PER_WORD, &SPIBits) < 0) {
                 HAL_ERROR2("Failed to set RD 8 bit mode on bus %d, select %d\n", m_SPIBus, m_SPISelect);
-                close(m_SPIBus);
+                close(bus);
                 return false;
             }
 
-            if (ioctl(m_SPI, SPI_IOC_WR_MAX_SPEED_HZ, &SPISpeed) < 0) {
+            if (ioctl(bus, SPI_IOC_WR_MAX_SPEED_HZ, &SPISpeed) < 0) {
                 HAL_ERROR3("Failed to set WR %dHz on bus %d, select %d\n", SPISpeed, m_SPIBus, m_SPISelect);
-                close(m_SPIBus);
+                close(bus);
                 return false;
             }
 
-            if (ioctl(m_SPI, SPI_IOC_RD_MAX_SPEED_HZ, &SPISpeed) < 0) {
+            if (ioctl(bus, SPI_IOC_RD_MAX_SPEED_HZ, &SPISpeed) < 0) {
                 HAL_ERROR3("Failed to set RD %dHz on bus %d, select %d\n", SPISpeed, m_SPIBus, m_SPISelect);
-                close(m_SPIBus);
+                close(bus);
                 return false;
             }
+
+            m_SPI = (uintptr_t)bus;
 #else   // __linux__
             return false;
 #endif  // __linux__
@@ -241,8 +324,15 @@ void RTIMUHal::SPIClose()
 {
     if (m_SPI >= 0) {
         if (m_SPIBus >= 8) {
+#ifdef RTHAL_MPSSE
             // FTDI
             SPI_CloseChannel((FT_HANDLE)m_SPI);
+#elif defined(RTHAL_LIBFTDI)
+            ftdispi_context *fsc = (ftdispi_context *)m_SPI;
+            ftdispi_close(fsc, 1);
+
+            delete fsc;
+#endif
         } else {
 #ifdef __linux__
             close(m_SPI);
@@ -294,7 +384,7 @@ bool RTIMUHal::HALWrite(unsigned char slaveAddr, unsigned char regAddr, unsigned
 
         if (result < 0) {
             if (strlen(errorMsg) > 0)
-                HAL_ERROR3("%s data write of %d bytes failed - %s\n", ifType, length, errorMsg);
+                HAL_ERROR("%s data write of %d bytes failed: %d - %s\n", ifType, length, result, errorMsg);
             return false;
         } else if (result < (int)length) {
             if (strlen(errorMsg) > 0)
@@ -320,6 +410,7 @@ int RTIMUHal::ifWrite(unsigned char *data, unsigned char length)
         }
 
         if (m_SPIBus >= 8) {
+#ifdef RTHAL_MPSSE
             // FTDI write.
             FT_STATUS status;
             uint32 size_transferred = 0;
@@ -332,6 +423,15 @@ int RTIMUHal::ifWrite(unsigned char *data, unsigned char length)
             }
 
             return size_transferred;
+#elif defined(RTHAL_LIBFTDI)
+            int status = ftdispi_write((ftdispi_context *)m_SPI, data, length, 0);
+            if (status < 0) {
+                HAL_ERROR("Write failed, status %d\n", status);
+                return status;
+            }
+
+            return length;
+#endif
         } else {
 #ifdef __linux__
             struct spi_ioc_transfer wrIOC;
@@ -387,7 +487,7 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char regAddr, uint16_t 
 #endif  // __linux__
     } else {
         if (length > MAX_READ_LEN) {
-            HAL_ERROR1("HALRead exceeds maximum read length (%d)", length);
+            HAL_ERROR1("HALRead exceeds maximum read length (%d)\n", length);
             return false;
         }
 
@@ -396,24 +496,35 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, unsigned char regAddr, uint16_t 
         memset(rxBuff + 1, 0, length);
 
         if (m_SPIBus >= 8) {
+#ifdef RTHAL_MPSSE
             FT_STATUS status = FT_OK;
             uint32 size_transferred = 0;
 
-            status = SPI_Write((FT_HANDLE *)m_SPI, rxBuff, 1, &size_transferred,
-                               SPI_TRANSFER_OPTIONS_SIZE_IN_BYTES | SPI_TRANSFER_OPTIONS_CHIPSELECT_ENABLE);
+            status = SPI_ReadWrite((FT_HANDLE *)m_SPI, rxBuff, rxBuff, length + 1, &size_transferred,
+                                   SPI_TRANSFER_OPTIONS_SIZE_IN_BYTES | SPI_TRANSFER_OPTIONS_CHIPSELECT_ENABLE |
+                                       SPI_TRANSFER_OPTIONS_CHIPSELECT_DISABLE);
 
-            size_transferred = 0;
-
-            // One call to SPI_ReadWrite may not transfer the entire requested length. So we repeat the call.
-            while (size_transferred != length) {
-                // SPI reads are done by transferring a reg address and junk for the expected return length.
-                status = SPI_Read((FT_HANDLE *)m_SPI, rxBuff + 1, length, &size_transferred,
-                                  SPI_TRANSFER_OPTIONS_SIZE_IN_BYTES | SPI_TRANSFER_OPTIONS_CHIPSELECT_DISABLE);
-                if (!FT_SUCCESS(status)) {
-                    HAL_ERROR3("FTDI SPI read error (%d, reg %.2X, %s)", status, regAddr, errorMsg);
-                    return false;
-                }
+            if (!FT_SUCCESS(status)) {
+                HAL_ERROR3("FTDI SPI read error (%d, reg %.2X, %s)\n", status, regAddr, errorMsg);
+                return false;
             }
+
+            if (size_transferred < length) {
+                HAL_ERROR("FTDI SPI failed to read data (%d, reg %.2X, %s)\n", status, regAddr, errorMsg);
+                return false;
+            }
+#elif defined(RTHAL_LIBFTDI)
+            int status = ftdispi_write_read((ftdispi_context *)m_SPI, rxBuff, length + 1, rxBuff, length + 1, 0);
+            if (status < 0) {
+                HAL_ERROR("FTDI SPI read error (%d, reg %.2X, %s)\n", status, regAddr, errorMsg);
+                return false;
+            }
+
+            if (status < length) {
+                HAL_ERROR("FTDI SPI failed to read data (%d, reg %.2X, %s)\n", status, regAddr, errorMsg);
+                return false;
+            }
+#endif
         } else {
 #ifdef __linux__
             struct spi_ioc_transfer rdIOC;
@@ -445,6 +556,7 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, uint16_t length, unsigned char *
 
         total = 0;
         tries = 0;
+        result = 0;
 
 #ifdef __linux__
         while ((total < length) && (tries < 5)) {
@@ -475,6 +587,7 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, uint16_t length, unsigned char *
         unsigned char rxBuff[MAX_READ_LEN + 1];
 
         if (m_SPIBus >= 8) {
+#ifdef RTHAL_MPSSE
             FT_STATUS status;
             uint32 size_transferred = 0;
 
@@ -485,6 +598,13 @@ bool RTIMUHal::HALRead(unsigned char slaveAddr, uint16_t length, unsigned char *
                 HAL_ERROR2("FTDI SPI Read failure %d - %s\n", status, errorMsg);
                 return false;
             }
+#elif defined(RTHAL_LIBFTDI)
+            int status = ftdispi_read((ftdispi_context *)m_SPI, rxBuff, length, 0);
+            if (status < 0) {
+                HAL_ERROR("FTDI SPI Read failure %d - %s\n", status, errorMsg);
+                return false;
+            }
+#endif
         } else {
 #ifdef __linux__
             struct spi_ioc_transfer rdIOC;

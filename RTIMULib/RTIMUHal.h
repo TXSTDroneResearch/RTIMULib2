@@ -35,13 +35,24 @@
 #include <stdlib.h>
 
 #ifndef HAL_QUIET
-#define HAL_INFO(m) { printf("%s", m); fflush(stdout); }
+#define HAL_INFO(...)                                             \
+    do {                                                          \
+        printf("%s:%d:%s(): ", __FILE__, __LINE__, __FUNCTION__); \
+        printf(__VA_ARGS__);                                      \
+    } while (0)
+
 #define HAL_INFO1(m, x) { printf(m, x); fflush(stdout); }
 #define HAL_INFO2(m, x, y) { printf(m, x, y); fflush(stdout); }
 #define HAL_INFO3(m, x, y, z) { printf(m, x, y, z); fflush(stdout); }
 #define HAL_INFO4(m, x, y, z, a) { printf(m, x, y, z, a); fflush(stdout); }
 #define HAL_INFO5(m, x, y, z, a, b) { printf(m, x, y, z, a, b); fflush(stdout); }
-#define HAL_ERROR(m)    fprintf(stderr, m);
+
+#define HAL_ERROR(...)                                                     \
+    do {                                                                   \
+        fprintf(stderr, "%s:%d:%s(): ", __FILE__, __LINE__, __FUNCTION__); \
+        fprintf(stderr, __VA_ARGS__);                                      \
+    } while (0)
+
 #define HAL_ERROR1(m, x)    fprintf(stderr, m, x);
 #define HAL_ERROR2(m, x, y)    fprintf(stderr, m, x, y);
 #define HAL_ERROR3(m, x, y, z)    fprintf(stderr, m, x, y, z);
@@ -49,13 +60,13 @@
 
 #else
 
-#define HAL_INFO(m)
+#define HAL_INFO(...)
 #define HAL_INFO1(m, x)
 #define HAL_INFO2(m, x, y)
 #define HAL_INFO3(m, x, y, z)
 #define HAL_INFO4(m, x, y, z, a)
 #define HAL_INFO5(m, x, y, z, a, b)
-#define HAL_ERROR(m)
+#define HAL_ERROR(...)
 #define HAL_ERROR1(m, x)
 #define HAL_ERROR2(m, x, y)
 #define HAL_ERROR3(m, x, y, z)
@@ -65,6 +76,14 @@
 
 #define MAX_WRITE_LEN                   512
 #define MAX_READ_LEN                    512
+
+enum HALMode {
+  MODE_INVALID = 0,
+  MODE_I2C,
+  MODE_SPI,
+  MODE_I2C_FTDI,
+  MODE_SPI_FTDI
+};
 
 class RTIMUHal
 {

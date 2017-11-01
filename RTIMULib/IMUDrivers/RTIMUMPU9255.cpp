@@ -535,7 +535,7 @@ bool RTIMUMPU9255::IMURead()
     // "The MPU-9255 contains a 512-byte FIFO register"
     // High-water mark, flush the fifo.
     if (count >= 448) {
-        HAL_INFO("Flush MPU-9255 fifo\n");
+        HAL_INFO("Flush MPU-9255 fifo (%d bytes)\n", count);
         m_imuData.timestamp += m_sampleInterval * (512 / MPU9255_FIFO_MAX_CHUNK_SIZE + 1);  // try to fix timestamp
         resetFifo();
 
