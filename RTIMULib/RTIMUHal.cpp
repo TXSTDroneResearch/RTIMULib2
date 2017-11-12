@@ -100,6 +100,8 @@ bool RTIMUHal::HALOpen()
             m_I2C = -1;
             return false;
         }
+
+        return true;
 #else   // __linux__
         return false;
 #endif  // __linux__
@@ -147,6 +149,7 @@ bool RTIMUHal::HALOpen()
                 HAL_INFO("		ftHandle=0x%p\n", chan_info.ftHandle); /*is 0 unless open*/
 
                 if (chan_info.ftHandle != NULL) {
+                    HAL_INFO("Using existing handle 0x%p\n", chan_info.ftHandle);
                     m_SPI = (uintptr_t)chan_info.ftHandle;
                     return true;
                 }
@@ -172,6 +175,7 @@ bool RTIMUHal::HALOpen()
 
             // Successfully connected!
             m_SPI = (uintptr_t)handle;
+            return true;
 #elif defined(RTHAL_LIBFTDI)
             // Using libftdispi
             ftdi_context fc;
@@ -244,6 +248,7 @@ bool RTIMUHal::HALOpen()
 
             // Successfully connected!
             m_SPI = (uintptr_t)fsc;
+            return true;
 #endif
         } else {
 #ifdef __linux__
@@ -295,12 +300,15 @@ bool RTIMUHal::HALOpen()
             }
 
             m_SPI = (uintptr_t)bus;
+
+            return true;
 #else   // __linux__
             return false;
 #endif  // __linux__
         }
     }
-    return true;
+
+    return false;
 }
 
 void RTIMUHal::HALClose()

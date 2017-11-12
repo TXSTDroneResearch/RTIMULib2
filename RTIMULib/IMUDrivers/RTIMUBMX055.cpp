@@ -408,7 +408,7 @@ int RTIMUBMX055::IMUGetPollInterval()
         return (400 / m_sampleRate);
 }
 
-bool RTIMUBMX055::IMURead()
+int RTIMUBMX055::IMURead()
 {
     unsigned char status;
     unsigned char gyroData[6];

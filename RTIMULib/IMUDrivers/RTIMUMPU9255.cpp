@@ -31,14 +31,7 @@ RTIMUMPU9255::RTIMUMPU9255(RTIMUSettings *settings) : RTIMU(settings) { m_device
 
 RTIMUMPU9255::~RTIMUMPU9255()
 {
-    if (m_deviceOpen) {
-        //  reset the MPU9255 and shut down
-        m_settings->HALWrite(m_slaveAddr, MPU9255_PWR_MGMT_1, MPU9255_PWR_MGMT_1_H_RESET,
-                             "Failed to initiate MPU9255 reset");
-        m_settings->HALClose();
-
-        m_deviceOpen = false;
-    }
+  IMUShutdown();
 }
 
 bool RTIMUMPU9255::setSampleRate(int rate)
@@ -283,6 +276,18 @@ bool RTIMUMPU9255::IMUInit()
     return true;
 }
 
+void RTIMUMPU9255::IMUShutdown()
+{
+    if (m_deviceOpen) {
+        //  reset the MPU9255 and shut down
+        m_settings->HALWrite(m_slaveAddr, MPU9255_PWR_MGMT_1, MPU9255_PWR_MGMT_1_H_RESET,
+                             "Failed to initiate MPU9255 reset");
+        m_settings->HALClose();
+
+        m_deviceOpen = false;
+    }
+}
+
 bool RTIMUMPU9255::resetFifo()
 {
     if (!m_settings->HALWrite(m_slaveAddr, MPU9255_INT_ENABLE, 0, "Reset int enable"))
@@ -519,7 +524,40 @@ int RTIMUMPU9255::IMUGetPollInterval()
         return (400 / m_sampleRate);
 }
 
-bool RTIMUMPU9255::IMURead()
+void RTIMUMPU9255::IMUEnableGyro(bool enable)
+{
+    if (enable) {
+        m_fifoEna |= MPU9255_FIFO_EN_GYRO_ALL;
+    } else {
+        m_fifoEna &= ~MPU9255_FIFO_EN_GYRO_ALL;
+    }
+
+    resetFifo();
+}
+
+void RTIMUMPU9255::IMUEnableAccel(bool enable)
+{
+    if (enable) {
+        m_fifoEna |= MPU9255_FIFO_EN_ACCEL;
+    } else {
+        m_fifoEna &= ~MPU9255_FIFO_EN_ACCEL;
+    }
+
+    resetFifo();
+}
+
+void RTIMUMPU9255::IMUEnableCompass(bool enable)
+{
+    if (enable) {
+        m_fifoEna |= MPU9255_FIFO_EN_SLV_0;
+    } else {
+        m_fifoEna &= ~MPU9255_FIFO_EN_SLV_0;
+    }
+
+    resetFifo();
+}
+
+int RTIMUMPU9255::IMURead()
 {
     uint32_t count;
     uint16_t fifoCount;
@@ -527,7 +565,7 @@ bool RTIMUMPU9255::IMURead()
     uint32_t chunkSize = 0;
 
     if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_COUNT_H, 2, (uint8_t *)&fifoCount, "Failed to read fifo count"))
-        return false;
+        return -1;
 
     // Byteswap the count to little endian.
     count = ((fifoCount & 0xFF00) >> 8) + ((fifoCount & 0x00FF) << 8);
@@ -536,7 +574,7 @@ bool RTIMUMPU9255::IMURead()
     // High-water mark, flush the fifo.
     if (count >= 448) {
         HAL_INFO("Flush MPU-9255 fifo (%d bytes)\n", count);
-        m_imuData.timestamp += m_sampleInterval * (512 / MPU9255_FIFO_MAX_CHUNK_SIZE + 1);  // try to fix timestamp
+        m_imuData.timestamp += m_sampleInterval * (count / MPU9255_FIFO_MAX_CHUNK_SIZE + 1);  // try to fix timestamp
         resetFifo();
 
         // Flush the internal cache as well.
@@ -544,11 +582,12 @@ bool RTIMUMPU9255::IMURead()
         m_cacheIn = 0;
         m_cacheOut = 0;
 
-        return false;
+        return 0;
     }
 
     if (m_fifoEna == 0) {
-        return false;
+        // Nothing enabled. Return now!
+        return 0;
     }
 
     // Calculate chunk size based on fifo enabled
@@ -569,7 +608,7 @@ bool RTIMUMPU9255::IMURead()
     if ((m_cacheCount == 0) && (count >= chunkSize) && (count < (MPU9255_CACHE_SIZE * chunkSize))) {
         // special case of a small fifo and nothing cached - just handle as simple read
         if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_R_W, chunkSize, fifoData, "Failed to read fifo data"))
-            return false;
+            return -1;
     } else {
         if (count >= (MPU9255_CACHE_SIZE * chunkSize)) {
             int blockCount = count / chunkSize;  // number of chunks in fifo
@@ -589,7 +628,7 @@ bool RTIMUMPU9255::IMURead()
 
             if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_R_W, chunkSize * blockCount, m_cache[m_cacheIn].data,
                                      "Failed to read fifo data"))
-                return false;
+                return -1;
 
             m_cache[m_cacheIn].count = blockCount;
             m_cache[m_cacheIn].index = 0;
@@ -601,7 +640,7 @@ bool RTIMUMPU9255::IMURead()
 
         //  now fifo has been read if necessary, get something to process
         if (m_cacheCount == 0)
-            return false;
+            return 0;
 
         memcpy(fifoData, m_cache[m_cacheOut].data + m_cache[m_cacheOut].index, chunkSize);
         m_cache[m_cacheOut].index += chunkSize;
@@ -620,17 +659,17 @@ bool RTIMUMPU9255::IMURead()
         // more than 40 samples behind - going too slowly so discard some samples but maintain timestamp correctly
         while (count >= MPU9255_FIFO_CHUNK_SIZE * 10) {
             if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_R_W, MPU9255_FIFO_CHUNK_SIZE, fifoData, "Failed to read fifo data"))
-                return false;
+                return -1;
             count -= MPU9255_FIFO_CHUNK_SIZE;
             m_imuData.timestamp += m_sampleInterval;
         }
     }
 
     if (count < MPU9255_FIFO_CHUNK_SIZE)
-        return false;
+        return 0;
 
     if (!m_settings->HALRead(m_slaveAddr, MPU9255_FIFO_R_W, MPU9255_FIFO_CHUNK_SIZE, fifoData, "Failed to read fifo data"))
-        return false;
+        return -1;
 
 #endif
 
@@ -695,7 +734,7 @@ bool RTIMUMPU9255::IMURead()
 
     updateFusion();
 
-    return true;
+    return 1;
 }
 
 

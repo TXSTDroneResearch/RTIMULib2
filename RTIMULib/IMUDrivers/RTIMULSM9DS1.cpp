@@ -349,7 +349,7 @@ int RTIMULSM9DS1::IMUGetPollInterval()
     return (400 / m_sampleRate);
 }
 
-bool RTIMULSM9DS1::IMURead()
+int RTIMULSM9DS1::IMURead()
 {
     unsigned char status;
     unsigned char gyroData[6];

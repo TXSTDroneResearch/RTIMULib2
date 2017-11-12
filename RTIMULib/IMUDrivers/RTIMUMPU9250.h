@@ -73,7 +73,7 @@ public:
     virtual const char *IMUName() { return "MPU-9250"; }
     virtual int IMUType() { return RTIMU_TYPE_MPU9250; }
     virtual bool IMUInit();
-    virtual bool IMURead();
+    virtual int IMURead();
     virtual int IMUGetPollInterval();
 
 protected:

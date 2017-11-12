@@ -42,7 +42,7 @@ int RTIMUNull::IMUGetPollInterval()
     return (100);                                           // just a dummy value really
 }
 
-bool RTIMUNull::IMURead()
+int RTIMUNull::IMURead()
 {
     updateFusion();
     return true;

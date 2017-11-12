@@ -37,7 +37,7 @@ public:
     virtual int IMUType() { return RTIMU_TYPE_BNO055; }
     virtual bool IMUInit();
     virtual int IMUGetPollInterval();
-    virtual bool IMURead();
+    virtual int IMURead();
 
 private:
     unsigned char m_slaveAddr;                              // I2C address of BNO055

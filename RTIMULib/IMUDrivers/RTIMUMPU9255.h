@@ -76,12 +76,17 @@ public:
     virtual const char *IMUName() { return "MPU-9255"; }
     virtual int IMUType() { return RTIMU_TYPE_MPU9255; }
     virtual bool IMUInit();
-    virtual bool IMURead();
+    virtual void IMUShutdown();
+    virtual int IMURead();
     virtual int IMUGetPollInterval();
 
 protected:
 
     RTFLOAT m_compassAdjust[3];                             // the compass fuse ROM values converted for use
+
+    void IMUEnableGyro(bool enable) override;
+    void IMUEnableAccel(bool enable) override;
+    void IMUEnableCompass(bool enable) override;
 
 private:
     

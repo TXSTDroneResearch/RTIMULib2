@@ -129,7 +129,7 @@ int RTIMUBNO055::IMUGetPollInterval()
     return (7);
 }
 
-bool RTIMUBNO055::IMURead()
+int RTIMUBNO055::IMURead()
 {
     unsigned char buffer[24];
 

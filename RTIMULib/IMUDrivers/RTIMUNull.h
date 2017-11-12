@@ -48,7 +48,7 @@ public:
     virtual int IMUType() { return RTIMU_TYPE_NULL; }
     virtual bool IMUInit();
     virtual int IMUGetPollInterval();
-    virtual bool IMURead();
+    virtual int IMURead();
     virtual bool IMUGyroBiasValid() { return true; }
 
 private:

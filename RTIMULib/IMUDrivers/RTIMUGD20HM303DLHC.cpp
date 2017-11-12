@@ -391,7 +391,7 @@ int RTIMUGD20HM303DLHC::IMUGetPollInterval()
     return (400 / m_sampleRate);
 }
 
-bool RTIMUGD20HM303DLHC::IMURead()
+int RTIMUGD20HM303DLHC::IMURead()
 {
     unsigned char status;
     unsigned char gyroData[6];

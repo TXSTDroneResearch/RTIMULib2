@@ -80,8 +80,9 @@ public:
     virtual const char *IMUName() = 0;                      // the name of the IMU
     virtual int IMUType() = 0;                              // the type code of the IMU
     virtual bool IMUInit() = 0;                             // set up the IMU
+    virtual void IMUShutdown() {}                           // shuts down the IMU
     virtual int IMUGetPollInterval() = 0;                   // returns the recommended poll interval in mS
-    virtual bool IMURead() = 0;                             // get a sample
+    virtual int IMURead() = 0;                              // get a sample (returns < 0 on fatal error, e.g. disconnected)
 
     // setGyroContinuousALearninglpha allows the continuous learning rate to be over-ridden
     // The value must be between 0.0 and 1.0 and will generally be close to 0
@@ -166,6 +167,10 @@ protected:
     void calibrateAverageCompass();                         // calibrate and smooth compass
     void calibrateAccel();                                  // calibrate the accelerometers
     void updateFusion();                                    // call when new data to update fusion state
+
+    virtual void IMUEnableGyro(bool enable) {}              // called when gyro enable changed
+    virtual void IMUEnableAccel(bool enable) {}             // called when accel enable changed
+    virtual void IMUEnableCompass(bool enable) {}           // called when compass enable changed
 
     bool m_compassCalibrationMode;                          // true if cal mode so don't use cal data!
     bool m_accelCalibrationMode;                            // true if cal mode so don't use cal data!

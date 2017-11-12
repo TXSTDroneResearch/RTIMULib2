@@ -62,7 +62,7 @@ public:
     virtual int IMUType() { return RTIMU_TYPE_GD20HM303DLHC; }
     virtual bool IMUInit();
     virtual int IMUGetPollInterval();
-    virtual bool IMURead();
+    virtual int IMURead();
 
 private:
     bool setGyroSampleRate();

@@ -505,7 +505,7 @@ int RTIMUMPU9250::IMUGetPollInterval()
         return (400 / m_sampleRate);
 }
 
-bool RTIMUMPU9250::IMURead()
+int RTIMUMPU9250::IMURead()
 {
     unsigned char fifoCount[2];
     unsigned int count;

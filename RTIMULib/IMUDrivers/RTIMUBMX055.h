@@ -37,7 +37,7 @@ public:
     virtual int IMUType() { return RTIMU_TYPE_BMX055; }
     virtual bool IMUInit();
     virtual int IMUGetPollInterval();
-    virtual bool IMURead();
+    virtual int IMURead();
 
 private:
     bool setGyroSampleRate();
