@@ -38,9 +38,10 @@ INCLUDE(FeatureSummary)
 ########################################################################
 # Project setup
 ########################################################################
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.9)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 PROJECT(RTIMULib CXX)
 ENABLE_TESTING()
+set (CMAKE_CXX_STANDARD 11)
 
 INCLUDE(CMakeToolsHelpers OPTIONAL)
 
