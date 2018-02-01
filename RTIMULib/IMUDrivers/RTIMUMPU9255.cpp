@@ -228,7 +228,7 @@ bool RTIMUMPU9255::IMUInit()
         return false;
 
     if (result != MPU9255_ID) {
-        HAL_ERROR2("Incorrect %s id %d\n", IMUName(), result);
+        HAL_ERROR("Incorrect %s id %d\n", IMUName(), result);
         return false;
     }
 

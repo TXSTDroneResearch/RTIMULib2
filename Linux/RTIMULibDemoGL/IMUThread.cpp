@@ -59,8 +59,13 @@ void IMUThread::newIMU()
         return;
 
     //  set up IMU
+    if (!m_imu->IMUInit()) {
+        qDebug() << "IMUInit failed.";
+        delete m_imu;
+        m_imu = NULL;
 
-    m_imu->IMUInit();
+        return;
+    }
 
     m_timer = startTimer(m_imu->IMUGetPollInterval());
 }
@@ -173,8 +178,8 @@ void IMUThread::timerEvent(QTimerEvent * /* event */)
         return;
 
     //  loop here to clear all samples just in case things aren't keeping up
-
-    while (m_imu->IMURead()) {
+    int res = 0;
+    while ((res = m_imu->IMURead()) > 0) {
         if (m_calibrationMode) {
             emit newCalData(m_imu->getCompass());
         } else {
@@ -186,6 +191,14 @@ void IMUThread::timerEvent(QTimerEvent * /* event */)
 
             emit newIMUData(data);
         }
+    }
+
+    if (res < 0) {
+        // Fatal error. This IMU is now dead.
+        qDebug() << "Failed to communicate with IMU.";
+        delete m_imu;
+        m_imu = NULL;
+        return;
     }
 }
 
