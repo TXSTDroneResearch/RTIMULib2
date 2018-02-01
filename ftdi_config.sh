@@ -17,13 +17,4 @@ echo
 echo "** Retriggering udev"
 /etc/init.d/udev trigger
 echo
-echo "!! Run the following command as root, to add your user to the plugdev group:"
-echo "useradd -G plugdev yourusernamehere"
-echo
-echo "or"
-echo
-echo "Adding to a existing user:"
-echo "usermod -a -G plugdev yourusernamehere"
-echo
-echo "as then you must reboot the system:"
-echo "reboot" 
+echo "!! Done. Replug your device!"
