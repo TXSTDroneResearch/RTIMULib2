@@ -54,6 +54,7 @@ CMAKE_DEPENDENT_OPTION(BUILD_DEMOGL "Build RTIMULibDemoGL" ON
                        "BUILD_GL" OFF)
 
 ADD_FEATURE_INFO(RTIMULibGL BUILD_GL "")
+ADD_FEATURE_INFO(RTIMU BUILD_PY "Builds a Python library to interface with RTIMU")
 ADD_FEATURE_INFO(RTIMULibDrive BUILD_DRIVE "App that shows how to use the RTIMULib library in a basic way.")
 ADD_FEATURE_INFO(RTIMULibDrive10 BUILD_DRIVE10 "App that shows to use  pressure/temperature sensors.")
 ADD_FEATURE_INFO(RTIMULibDrive11 BUILD_DRIVE11 "App that shows to use  pressure/temperature/humidity sensors.")
@@ -73,6 +74,10 @@ IF(BUILD_GL)
     INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/RTIMULibGL/VRWidgetLib)
     ADD_SUBDIRECTORY(${CMAKE_CURRENT_SOURCE_DIR}/RTIMULibGL)
 ENDIF(BUILD_GL)
+
+IF(BUILD_PY)
+    ADD_SUBDIRECTORY(python)
+ENDIF()
 
 IF(BUILD_DRIVE)
     ADD_SUBDIRECTORY(RTIMULibDrive)

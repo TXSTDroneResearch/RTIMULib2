@@ -157,8 +157,12 @@ int Unpack_VEC3(const PyObject* val, RTVector3& dest)
 static PyGetSetDef RTIMU_Settings_getset[] = {
     RTIMU_PARAM_INT(IMUType, m_imuType),
     RTIMU_PARAM_INT(FusionType, m_fusionType),
+    RTIMU_PARAM_INT(BusIsI2C, hal()->m_busIsI2C),
     RTIMU_PARAM_INT(I2CAddress, m_I2CSlaveAddress),
-    RTIMU_PARAM_INT(I2CBus, m_I2CBus),
+    RTIMU_PARAM_INT(I2CBus, hal()->m_I2CBus),
+    RTIMU_PARAM_INT(SPIBus, hal()->m_SPIBus),
+    RTIMU_PARAM_INT(SPISelect, hal()->m_SPISelect),
+    RTIMU_PARAM_INT(SPISpeed, hal()->m_SPISpeed),
     RTIMU_PARAM_INT(CompassCalValid, m_compassCalValid),
     RTIMU_PARAM_VEC3(CompassCalMin, m_compassCalMin),
     RTIMU_PARAM_VEC3(CompassCalMax, m_compassCalMax),
@@ -357,9 +361,7 @@ static PyObject* RTIMU_Settings_discover(RTIMU_Settings* self, PyObject *args, P
         return NULL;
 
     // Do the discovery
-    unsigned char slave_addr_ch = slave_addr;
-    bool isI2C;
-    bool r = self->val->discoverIMU(imu_type, isI2C, slave_addr_ch);
+    bool r = self->val->discoverIMU();
 
     if (r) {
         Py_RETURN_TRUE;

@@ -38,6 +38,7 @@ struct RTIMU_Settings {
 struct RTIMU_RTIMU {
   PyObject_HEAD
   RTIMU* val;
+  RTIMU_Settings* settings;
 };
 
 // Create the RTIMU_Settings type

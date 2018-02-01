@@ -84,6 +84,16 @@ static PyMethodDef RTIMU_RTIMU_methods[] = {
         METH_NOARGS,
     "Set up the IMU" },
 
+    //////// IMUShutdown
+    {"IMUShutdown", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
+        if (((RTIMU_RTIMU*)self)->val != NULL)
+            ((RTIMU_RTIMU*)self)->val->IMUShutdown();
+
+        Py_RETURN_NONE;
+        }),
+        METH_NOARGS,
+    "Shuts down the IMU" },
+
   //////// IMUGetPollInterval
   {"IMUGetPollInterval", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
 #if PY_MAJOR_VERSION >= 3
@@ -96,11 +106,20 @@ static PyMethodDef RTIMU_RTIMU_methods[] = {
     "Get the recommended poll interval in mS" },
 
     //////// IMURead
-    {"IMURead", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
-        return PyBool_FromLong(((RTIMU_RTIMU*)self)->val->IMURead());
+    {
+    "IMURead", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
+#if PY_MAJOR_VERSION >= 3
+        return PyLong_FromLong(((RTIMU_RTIMU*)self)->val->IMURead());
+#else
+        return PyInt_FromLong(((RTIMU_RTIMU*)self)->val->IMURead());
+#endif
         }),
     METH_NOARGS,
-    "Get a sample" },
+    "Read a sample from the IMU\n"
+    "\n"
+    "Returns:\n"
+    "   int: 1 if more data potentially available, 0 on no more data, -1 on fatal error"
+    },
 
     //////// IMUGyroBiasValid
     {"IMUGyroBiasValid", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
@@ -188,28 +207,21 @@ static PyMethodDef RTIMU_RTIMU_methods[] = {
     //////// getIMUData
     {"getIMUData", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
         const RTIMU_DATA& data = ((RTIMU_RTIMU*)self)->val->getIMUData();
-        return Py_BuildValue("{s:K,s:O,s:(d,d,d),s:O,s:(d,d,d,d),s:O,s:(d,d,d),s:O,s:(d,d,d),s:O,s:(d,d,d),s:O,s:d,s:O,s:d,s:O,s:d}",
+        return Py_BuildValue("{s:K,s:O,s:O,s:O,s:O,s:O,s:O,s:O,s:O}",
                  "timestamp", data.timestamp,
-                 "fusionPoseValid", PyBool_FromLong(data.fusionPoseValid),
-                 "fusionPose", data.fusionPose.x(), data.fusionPose.y(), data.fusionPose.z(),
-                 "fusionQPoseValid", PyBool_FromLong(data.fusionQPoseValid),
-                 "fusionQPose", data.fusionQPose.scalar(), data.fusionQPose.x(), data.fusionQPose.y(), data.fusionQPose.z(),
-                 "gyroValid", PyBool_FromLong(data.gyroValid),
-                 "gyro", data.gyro.x(), data.gyro.y(), data.gyro.z(),
-                 "accelValid", PyBool_FromLong(data.accelValid),
-                 "accel", data.accel.x(), data.accel.y(), data.accel.z(),
-                 "compassValid", PyBool_FromLong(data.compassValid),
-                 "compass", data.compass.x(), data.compass.y(), data.compass.z(),
-                 "pressureValid", PyBool_FromLong(data.pressureValid),
-                 "pressure", data.pressure,
-                 "temperatureValid", PyBool_FromLong(data.temperatureValid),
-                 "temperature", data.temperature,
-                 "humidityValid", PyBool_FromLong(data.humidityValid),
-                 "humidity", data.humidity);
-
-        }),
+                 "fusionPose", data.fusionPoseValid ? Py_BuildValue("(d,d,d)", data.fusionPose.x(), data.fusionPose.y(), data.fusionPose.z()) : Py_None,
+                 "fusionQPose", data.fusionQPoseValid ? Py_BuildValue("(d,d,d,d)", data.fusionQPose.scalar(), data.fusionQPose.x(), data.fusionQPose.y(), data.fusionQPose.z()) : Py_None,
+                 "gyro", data.gyroValid ? Py_BuildValue("(d,d,d)", data.gyro.x(), data.gyro.y(), data.gyro.z()) : Py_None,
+                 "accel", data.accelValid ? Py_BuildValue("(d,d,d)", data.accel.x(), data.accel.y(), data.accel.z()) : Py_None,
+                 "compass", data.compassValid ? Py_BuildValue("(d,d,d)", data.compass.x(), data.compass.y(), data.compass.z()) : Py_None,
+                 "pressure", data.pressureValid ? Py_BuildValue("d", data.pressure) : Py_None,
+                 "temperature", data.temperatureValid ? Py_BuildValue("d", data.temperature) : Py_None,
+                 "humidity", data.humidityValid ? Py_BuildValue("%d", data.humidity) : Py_None
+        );
+    }),
     METH_NOARGS,
-    "Return true if valid bias" },
+    "Returns a dictionary of keys corresponding to values in RTIMU_DATA.\n"
+    "If the respective data.xValid field is false, that data field will be set to None.\n" },
 
     //////// getMeasuredPose
     {"getMeasuredPose", (PyCFunction)([] (PyObject *self, PyObject* args) -> PyObject* {
@@ -355,6 +367,9 @@ static void RTIMU_RTIMU_dealloc(RTIMU_RTIMU* self)
 {
     if (self->val != NULL)
         delete self->val;
+
+    if (self->settings != NULL)
+        Py_DECREF(self->settings);
 }
 
 static PyObject* RTIMU_RTIMU_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -378,8 +393,10 @@ static int RTIMU_RTIMU_init(RTIMU_RTIMU *self, PyObject *args, PyObject *kwds)
     PyObject* settings;
 
     // The user should pass "product name" as an argument
-    if (!PyArg_ParseTuple(args, "O", &settings))
+    if (!PyArg_ParseTuple(args, "O", &settings)) {
+        PyErr_SetString(PyExc_ValueError, (char*)"Must provide a RTIMU.Settings object as the first parameter.");
         return -1;
+    }
 
     // Make sure the settings argument is of the correct size
     if (!RTIMU_Settings_typecheck(settings)) {
@@ -388,8 +405,9 @@ static int RTIMU_RTIMU_init(RTIMU_RTIMU *self, PyObject *args, PyObject *kwds)
     }
 
     // Create an RTIMU object
+    Py_INCREF(settings);
     self->val = RTIMU::createIMU(((RTIMU_Settings*)settings)->val);
-
+    self->settings = (RTIMU_Settings*)settings;
     return 0;
 }
 
